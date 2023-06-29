@@ -1,8 +1,8 @@
 #!/bin/bash
 
-export AWS_PROFILE=patronwills
-export AWS_REGION=eu-west-2
-export PROJECT_NAME=pwwp
+export AWS_PROFILE=default # update to your chosen AWSCLI profile
+export AWS_REGION=eu-west-2 # update to your chosen AWS region
+export PROJECT_NAME=wordpress_project # update to your chosen project name
 export DB_NAME=${PROJECT_NAME}_db
 export DB_USER=${PROJECT_NAME}_user
 export SFTP_USER=${PROJECT_NAME}_sftp
