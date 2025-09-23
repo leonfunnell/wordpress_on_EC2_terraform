@@ -1,6 +1,7 @@
 #!/bin/bash
 # must be run as sudo/root
 
+export DEBIAN_FRONTEND=noninteractive
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
@@ -14,18 +15,18 @@ set -e
 echo -e ${RED}running apt-get update...
 apt-get -yq update
 echo -e ${RED}running apt-get upgrade...
-apt-get -yq upgrade
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq upgrade
 echo -e ${RED}running apt-get update...
 apt-get -yq update
 
 echo -e ${RED}installing nfs-common...
-apt-get -yq install nfs-common
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install nfs-common
 
 mkdir -p /var/www/html
 mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport $EFS_DNSNAME:/  /var/www/html
 mount | grep /var/www/html
 echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip awscli
-apt-get -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip awscli
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip awscli
 
 echo -e ${RED}mounting NFS:
 echo "$EFS_DNSNAME:/ /var/www/html nfs4 defaults,_netdev 0 0" >> /etc/fstab
