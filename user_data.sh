@@ -40,8 +40,8 @@ for i in {1..5}; do
 done
 
 mount | grep /var/www/html
-echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip
-apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip
+echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl
 
 # Install AWS CLI v2
 sudo apt-get install -y curl
