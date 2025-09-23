@@ -10,7 +10,6 @@ resource "aws_efs_file_system" "wordpress_efs" {
 
 resource "aws_efs_mount_target" "wordpress_efs_mount" {
   file_system_id  = aws_efs_file_system.wordpress_efs.id
-  subnet_id       = aws_instance.wordpress_server.subnet_id
+  subnet_id       = local.effective_subnet_id
   security_groups = [aws_security_group.wordpress_sg.id]
 }
-
