@@ -61,7 +61,7 @@ resource "null_resource" "configure_server" {
   provisioner "remote-exec" {
     inline = [
       "chmod +x /home/ubuntu/user_data.sh",
-      "chmod +x /home/ubuntu/server_variables.sh",
+      "chmod +x /home/ubuntu/variables.sh",
       "cd /home/ubuntu",
       "sudo /home/ubuntu/user_data.sh"
     ]
