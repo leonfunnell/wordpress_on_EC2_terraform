@@ -44,8 +44,15 @@ AMI=$(aws ec2 describe-images --owners 099720109477 \
   $AWS_CLI_REGION_ARG $AWS_CLI_PROFILE_ARG \
   --query "Images[].{Name:Name,ImageId:ImageId}" \
   --output json | \
-  jq -r '.[] | select(.Name? and (.Name | test("ubuntu-[a-z]+-[0-9]{2}\\.04-"))) | .Name as $name | capture("ubuntu-[a-z]+-(?<year>[0-9]{2})\\.04-") as $c | select((($c.year | tonumber) % 2) == 0) | [$name, .ImageId, ($c.year | tonumber)] | @tsv' | \
-  sort -k3,3n | tail -n1 | cut -f2
+  jq -r '
+    .[]
+    | select(.Name | test("ubuntu.*-([0-9]{2})\\.04-"))
+    | .Name as $name
+    | capture("ubuntu.*-(?<year>[0-9]{2})\\.04-") as $c
+    | select((($c.year | tonumber) % 2) == 0)
+    | [$name, .ImageId, ($c.year | tonumber)]
+    | @tsv
+  ' | sort -k3,3n | tail -n1 | cut -f2
 )
 
 echo "Selected Ubuntu LTS AMI: $AMI"
