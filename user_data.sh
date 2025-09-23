@@ -49,6 +49,54 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv
 unzip -o /tmp/awscliv2.zip -d /tmp
 sudo /tmp/aws/install
 
+# Set correct permissions for WordPress
+chown -R www-data:www-data /var/www/html
+find /var/www/html -type d -exec chmod 755 {} \;
+find /var/www/html -type f -exec chmod 644 {} \;
+
+# Generate wp-config.php if it doesn't exist
+if [ ! -f /var/www/html/wp-config.php ]; then
+cat <<EOF > /var/www/html/wp-config.php
+<?php
+define('DB_NAME', '${DB_NAME}');
+define('DB_USER', '${DB_USER}');
+define('DB_PASSWORD', '${DB_PASSWORD}');
+define('DB_HOST', 'localhost');
+define('DB_CHARSET', 'utf8');
+define('DB_COLLATE', '');
+define('FS_METHOD', 'direct');
+
+// Authentication Unique Keys and Salts.
+
+define('AUTH_KEY',         '$(openssl rand -base64 32)');
+define('SECURE_AUTH_KEY',  '$(openssl rand -base64 32)');
+define('LOGGED_IN_KEY',    '$(openssl rand -base64 32)');
+define('NONCE_KEY',        '$(openssl rand -base64 32)');
+define('AUTH_SALT',        '$(openssl rand -base64 32)');
+define('SECURE_AUTH_SALT', '$(openssl rand -base64 32)');
+define('LOGGED_IN_SALT',   '$(openssl rand -base64 32)');
+define('NONCE_SALT',       '$(openssl rand -base64 32)');
+
+$table_prefix  = 'wp_';
+
+define('WP_DEBUG', false);
+
+if ( !defined('ABSPATH') )
+    define('ABSPATH', dirname(__FILE__) . '/');
+
+require_once(ABSPATH . 'wp-settings.php');
+EOF
+fi
+
+# Add FTP config for plugin/theme updates
+cat <<EOT >> /var/www/html/wp-config.php
+
+define('FTP_HOST', 'localhost');
+define('FTP_USER', '${SFTP_USER}');
+define('FTP_PASS', '${SFTP_PASSWORD}');
+EOT
+
+# Mount NFS and configure fstab
 echo -e ${RED}mounting NFS:
 echo "$EFS_DNSNAME:/ /var/www/html nfs4 defaults,_netdev 0 0" >> /etc/fstab
 mount -a
