@@ -9,8 +9,6 @@ resource "aws_instance" "wordpress_server" {
   vpc_security_group_ids = [aws_security_group.wordpress_sg.id]
 
   depends_on = [aws_efs_file_system.wordpress_efs]
-  # depends_on = [aws_efs_mount_target.wordpress_efs_mount]
-
 
   tags = {
     Name    = "${var.project_name}-server"
@@ -28,13 +26,10 @@ resource "aws_instance" "wordpress_server" {
       echo export EFS_ID=${aws_efs_file_system.wordpress_efs.id} >> server_variables.sh
       echo export EFS_DNSNAME=${aws_efs_file_system.wordpress_efs.dns_name} >> server_variables.sh
       echo export AWS_REGION=${var.aws_region} >> server_variables.sh
-      echo export AWS_ACCESS_KEY_ID=${aws_iam_access_key.efs_user.id} >> server_variables.sh
-      echo export AWS_SECRET_ACCESS_KEY=${aws_iam_access_key.efs_user.secret} >> server_variables.sh
       echo export PUBLIC_IP=${self.public_ip} >> server_variables.sh
     EOT
   }
 
-  
   provisioner "file" {
     source      = "user_data.sh"
     destination = "/home/ubuntu/user_data.sh"
@@ -58,11 +53,7 @@ resource "aws_instance" "wordpress_server" {
       private_key = file(local_file.ssh_key.filename)
     }
   }
-
-
-
 }
-
 
 resource "null_resource" "configure_server" {
   depends_on = [aws_efs_mount_target.wordpress_efs_mount]
@@ -76,7 +67,7 @@ resource "null_resource" "configure_server" {
   }
     connection {
       type        = "ssh"
-      user        = "ubuntu" # or the appropriate user for your instance
+      user        = "ubuntu"
       private_key = file(local_file.ssh_key.filename)
       host        = aws_eip.wordpress_eip.public_ip
     }
