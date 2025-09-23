@@ -40,8 +40,14 @@ for i in {1..5}; do
 done
 
 mount | grep /var/www/html
-echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip awscli
-apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip awscli
+echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip
+
+# Install AWS CLI v2
+sudo apt-get install -y curl
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+unzip -o /tmp/awscliv2.zip -d /tmp
+sudo /tmp/aws/install
 
 echo -e ${RED}mounting NFS:
 echo "$EFS_DNSNAME:/ /var/www/html nfs4 defaults,_netdev 0 0" >> /etc/fstab
