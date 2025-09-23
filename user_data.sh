@@ -54,6 +54,9 @@ chown -R www-data:www-data /var/www/html
 find /var/www/html -type d -exec chmod 755 {} \;
 find /var/www/html -type f -exec chmod 644 {} \;
 
+# Ensure /tmp is world-writable with sticky bit
+chmod 1777 /tmp
+
 # Generate wp-config.php if it doesn't exist
 if [ ! -f /var/www/html/wp-config.php ]; then
 cat <<EOF > /var/www/html/wp-config.php
