@@ -2,6 +2,31 @@
 
 source variables.sh
 
+# Set AWS_PROFILE and AWS_REGION with precedence: env > variables.sh > ~/.aws/config
+: "${AWS_PROFILE:=${AWS_PROFILE_FROM_VARS}}"
+: "${AWS_REGION:=${AWS_REGION_FROM_VARS}}"
+
+if [ -z "$AWS_PROFILE" ]; then
+  AWS_PROFILE=$(awk '/^\[default\]/{f=1} f && /^region/{print "default"; exit}' ~/.aws/config 2>/dev/null)
+fi
+
+if [ -z "$AWS_REGION" ]; then
+  AWS_REGION=$(awk -v profile="${AWS_PROFILE:-default}" '
+    $0 == "[profile "profile"]" {f=1; next}
+    $0 ~ /^\[.*\]/ {f=0}
+    f && /^region/ {print $3; exit}
+    ' ~/.aws/config 2>/dev/null)
+  # Fallback to default profile if not found
+  if [ -z "$AWS_REGION" ]; then
+    AWS_REGION=$(awk '/^\[default\]/{f=1} f && /^region/ {print $3; exit}' ~/.aws/config 2>/dev/null)
+  fi
+fi
+
+if [ -z "$AWS_REGION" ] || [ -z "$AWS_PROFILE" ]; then
+  echo "ERROR: AWS_REGION and/or AWS_PROFILE not set and could not be determined from ~/.aws/config" >&2
+  exit 1
+fi
+
 # Find the latest Ubuntu LTS AMI (dynamic, futureproof, matches ssd and ssd-gp3, always picks latest xx.04 with even year)
 AMI=$(aws ec2 describe-images --owners 099720109477 \
   --filters 'Name=name,Values=ubuntu/images/hvm-ssd*/ubuntu-*-amd64-server-*' 'Name=state,Values=available' \
