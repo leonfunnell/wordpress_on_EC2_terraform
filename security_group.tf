@@ -1,7 +1,15 @@
+data "aws_vpc" "default" {
+  default = true
+}
+
+locals {
+  effective_vpc_id = var.vpc_id != "" ? var.vpc_id : data.aws_vpc.default.id
+}
+
 resource "aws_security_group" "wordpress_sg" {
   name_prefix = "${var.project_name}-sg"
   description = "Security group for the WordPress server"
-  vpc_id      = var.vpc_id
+  vpc_id      = local.effective_vpc_id
 
   ingress {
     description = "SSH"
