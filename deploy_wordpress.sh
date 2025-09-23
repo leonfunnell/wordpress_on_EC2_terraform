@@ -34,8 +34,7 @@ AMI=$(aws ec2 describe-images --owners 099720109477 \
   --query "Images[].{Name:Name,ImageId:ImageId}" \
   --output json | \
   jq -r '
-    .[] |
-    select(.Name | test("ubuntu-[a-z]+-[0-9]{2}\\.04-")) |
+    .[] | select(.Name? and (.Name | test("ubuntu-[a-z]+-[0-9]{2}\\.04-"))) |
     .Name as $name |
     capture("ubuntu-[a-z]+-(?<year>[0-9]{2})\\.04-") as $c |
     select((($c.year | tonumber) % 2) == 0) |
