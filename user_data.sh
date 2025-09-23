@@ -29,6 +29,9 @@ for i in {1..24}; do
   sleep 5
 done
 
+# Ensure mount point exists before mounting
+mkdir -p /var/www/html
+
 # Retry EFS mount up to 5 times
 for i in {1..5}; do
   mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport $EFS_DNSNAME:/  /var/www/html && break
