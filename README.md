@@ -10,11 +10,34 @@ Deploy a Wordpress EC2 instance with EIP, EFS and IAM roles. Can be used for DR 
 # Configuration:
 Please update the variables.sh with a minimum of your AWSCLI profile (uses 'default' by default)
 
-
 # Usage
-# To deploy:
+To deploy:
+```
 ./deploy_wordpress.sh
-
-# To destroy (Don't do this in production!):
+```
+To destroy (Don't do this in production!):
+```
 ./deploy_wordpress.sh --destroy
+```
+
+# Features & Components
+- **Robust AMI selection:** Automatically selects the latest Ubuntu LTS AMI by date.
+- **Automated EC2 provisioning:** Launches a WordPress-ready EC2 instance with EIP (static IP).
+- **Elastic File System (EFS):** WordPress files are stored on EFS for durability and easy backup/restore.
+- **IAM roles:** Securely grants EC2 access to EFS and other AWS services.
+- **Automated MySQL setup:** Database and user are created automatically.
+- **Automatic wp-config.php generation:** DB credentials, FS_METHOD, and FTP config are set for plugin/theme updates.
+- **Plugin/theme/media update support:** Directory permissions and FS_METHOD allow updates via the WordPress admin UI.
+- **FTP/SFTP plugin update support:** FTP credentials are auto-configured for seamless plugin/theme updates.
+- **/tmp permissions:** Ensures /tmp is world-writable for plugin/theme updates.
+- **Required PHP modules:** Installs php-xml and php-curl for UpdraftPlus and S3 support.
+- **AWS CLI v2:** Installed using the official AWS installer for compatibility.
+- **Plugin auto-install:** Popular plugins (UpdraftPlus, Elementor, Wordfence, etc.) are downloaded and installed automatically.
+
+# Extending
+- You can add CloudFront/SSL, Route53, or other AWS services via Terraform for production use.
+- Easily customize plugins, themes, or additional configuration in user_data.sh.
+
+# Tested
+- Full WordPress deployment, plugin/theme/media updates, and S3 backup support (UpdraftPlus) are working out of the box.
 
