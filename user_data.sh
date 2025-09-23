@@ -22,8 +22,20 @@ apt-get -yq update
 echo -e ${RED}installing nfs-common...
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install nfs-common
 
-mkdir -p /var/www/html
-mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport $EFS_DNSNAME:/  /var/www/html
+# Wait for EFS DNS to resolve (max 2 minutes)
+for i in {1..24}; do
+  getent hosts $EFS_DNSNAME && break
+  echo "Waiting for EFS DNS to resolve..."
+  sleep 5
+done
+
+# Retry EFS mount up to 5 times
+for i in {1..5}; do
+  mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport $EFS_DNSNAME:/  /var/www/html && break
+  echo "Retrying EFS mount..."
+  sleep 5
+done
+
 mount | grep /var/www/html
 echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip awscli
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip awscli
