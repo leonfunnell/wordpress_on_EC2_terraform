@@ -19,6 +19,13 @@ AMI=$(aws ec2 describe-images --owners 099720109477 \
   sort -k3,3n | tail -n1 | cut -f2
 )
 
+echo "Selected Ubuntu LTS AMI: $AMI"
+
+if [ -z "$AMI" ]; then
+  echo "ERROR: No Ubuntu LTS AMI found! Check your AWS credentials, region, and jq/AMI filter." >&2
+  exit 1
+fi
+
 case "$1" in
 --destroy)
     echo "Destroying the Wordpress infrastructure..."
