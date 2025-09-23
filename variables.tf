@@ -54,3 +54,8 @@ variable "efs_allowed_cidr" {
   description = "CIDR block allowed to access EFS (default: VPC CIDR)"
   default     = "0.0.0.0/0"
 }
+
+variable "vpc_id" {
+  type        = string
+  description = "The VPC ID to deploy resources into"
+}

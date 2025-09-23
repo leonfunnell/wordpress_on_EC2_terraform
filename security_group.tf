@@ -1,6 +1,7 @@
 resource "aws_security_group" "wordpress_sg" {
   name_prefix = "${var.project_name}-sg"
   description = "Security group for the WordPress server"
+  vpc_id      = var.vpc_id
 
   ingress {
     description = "SSH"
