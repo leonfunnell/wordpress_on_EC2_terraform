@@ -7,6 +7,7 @@ resource "aws_instance" "wordpress_server" {
   key_name = aws_key_pair.deployer.key_name
 
   vpc_security_group_ids = [aws_security_group.wordpress_sg.id]
+  subnet_id = local.effective_subnet_id
 
   depends_on = [aws_efs_file_system.wordpress_efs]
 
