@@ -9,14 +9,6 @@ source variables.sh
 TMP=`mktemp -d`
 cd $TMP
 set -e
-# Set up AWS CLI
-mkdir -p /root/.aws
-
-cat <<EOF > /root/.aws/credentials
-[default]
-aws_access_key_id = ${AWS_ACCESS_KEY_ID}
-aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
-EOF
 
 # Set up EFS
 echo -e ${RED}running apt-get update...
@@ -66,14 +58,6 @@ sed -i "s/username_here/$DB_USER/g" /var/www/html/wp-config.php
 sed -i "s/password_here/$DB_PASSWORD/g" /var/www/html/wp-config.php
 chown -R www-data:www-data /var/www/html/
 
-# Configure SFTP
-#echo -e "$SFTP_PASSWORD\n$SFTP_PASSWORD" | passwd $PROJECT_NAME
-#usermod -d /var/www/html $PROJECT_NAME
-#sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-#sed -i '/Subsystem\tsftp\s\/usr\/lib\/openssh\/sftp-server/a Subsystem\tsftp\tinternal-sftp' /etc/ssh/sshd_config
-#echo -e "Match User $PROJECT_NAME\n\tChrootDirectory /var/www/html\n\tAllowTCPForwarding no\n\tX11Forwarding no\n\tForceCommand internal-sftp" >> /etc/ssh/sshd_config
-#service ssh restart
-
 echo -e ${RED}Download WordPress plugins...
 
 wget https://downloads.wordpress.org/plugin/cookie-notice.2.4.8.zip
@@ -84,5 +68,4 @@ wget https://downloads.wordpress.org/plugin/wordfence.7.9.3.zip
 wget https://downloads.wordpress.org/plugin/wordpress-importer.0.8.1.zip
 cd /var/www/html/wp-content/plugins
 echo -e ${RED}Unzip plugins...
-unzip $TMP/\*.zip
-
+unzip $TMP/*.zip
