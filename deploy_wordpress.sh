@@ -46,11 +46,11 @@ AMI=$(aws ec2 describe-images --owners 099720109477 \
   --output json | \
   jq -r '
     .[]
-    | select(.Name | test("ubuntu.*-([0-9]{2})\\.04-"))
+    | select(.Name? and (.Name | type == "string") and (.Name | test("-[0-9]{2}\\.04-")))
     | .Name as $name
-    | capture("ubuntu.*-(?<year>[0-9]{2})\\.04-") as $c
-    | select((($c.year | tonumber) % 2) == 0)
-    | [$name, .ImageId, ($c.year | tonumber)]
+    | capture("-([0-9]{2})\\.04-") as $c
+    | select((($c[1] | tonumber) % 2) == 0)
+    | [$name, .ImageId, ($c[1] | tonumber)]
     | @tsv
   ' | sort -k3,3n | tail -n1 | cut -f2
 )
