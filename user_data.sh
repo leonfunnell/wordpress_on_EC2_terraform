@@ -64,21 +64,15 @@ wget -c http://wordpress.org/latest.tar.gz
 tar -xzf latest.tar.gz
 mv wordpress/* /var/www/html/
 
-echo -e ${RED}Configure WordPress...
-cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
-sed -i "s/database_name_here/$DB_NAME/g" /var/www/html/wp-config.php
-sed -i "s/username_here/$DB_USER/g" /var/www/html/wp-config.php
-sed -i "s/password_here/$DB_PASSWORD/g" /var/www/html/wp-config.php
-chown -R www-data:www-data /var/www/html/
-
-echo -e ${RED}Download WordPress plugins...
-
+# Download plugins to $TMP
 wget https://downloads.wordpress.org/plugin/cookie-notice.2.4.8.zip
 wget https://downloads.wordpress.org/plugin/all-in-one-wp-migration.7.75.zip 
 wget https://downloads.wordpress.org/plugin/elementor.3.13.4.zip
 wget https://downloads.wordpress.org/plugin/updraftplus.1.23.4.zip
 wget https://downloads.wordpress.org/plugin/wordfence.7.9.3.zip
 wget https://downloads.wordpress.org/plugin/wordpress-importer.0.8.1.zip
-cd /var/www/html/wp-content/plugins
-echo -e ${RED}Unzip plugins...
-unzip $TMP/*.zip
+
+# Unzip plugins into the plugins directory
+for zip in $TMP/*.zip; do
+  unzip "$zip" -d /var/www/html/wp-content/plugins/
+done
