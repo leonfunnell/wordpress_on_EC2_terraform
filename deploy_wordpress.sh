@@ -6,20 +6,18 @@ source variables.sh
 : "${AWS_PROFILE:=${AWS_PROFILE_FROM_VARS}}"
 : "${AWS_REGION:=${AWS_REGION_FROM_VARS}}"
 
+# If AWS_PROFILE is not set, default to "default"
 if [ -z "$AWS_PROFILE" ]; then
-  AWS_PROFILE=$(awk '/^\[default\]/{f=1} f && /^region/{print "default"; exit}' ~/.aws/config 2>/dev/null)
+  AWS_PROFILE="default"
 fi
 
+# Get region for the profile from ~/.aws/config
 if [ -z "$AWS_REGION" ]; then
-  AWS_REGION=$(awk -v profile="${AWS_PROFILE:-default}" '
+  AWS_REGION=$(awk -v profile="$AWS_PROFILE" '
     $0 == "[profile "profile"]" {f=1; next}
     $0 ~ /^\[.*\]/ {f=0}
     f && /^region/ {print $3; exit}
-    ' ~/.aws/config 2>/dev/null)
-  # Fallback to default profile if not found
-  if [ -z "$AWS_REGION" ]; then
-    AWS_REGION=$(awk '/^\[default\]/{f=1} f && /^region/ {print $3; exit}' ~/.aws/config 2>/dev/null)
-  fi
+  ' ~/.aws/config)
 fi
 
 if [ -z "$AWS_REGION" ]; then
