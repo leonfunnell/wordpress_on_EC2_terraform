@@ -22,24 +22,29 @@ if [ -z "$AWS_REGION" ]; then
   fi
 fi
 
-if [ -z "$AWS_REGION" ] || [ -z "$AWS_PROFILE" ]; then
-  echo "ERROR: AWS_REGION and/or AWS_PROFILE not set and could not be determined from ~/.aws/config" >&2
+if [ -z "$AWS_REGION" ]; then
+  echo "ERROR: AWS_REGION not set and could not be determined from ~/.aws/config" >&2
   exit 1
+fi
+
+# Build AWS CLI profile/region arguments
+AWS_CLI_PROFILE_ARG=""
+if [ -n "$AWS_PROFILE" ]; then
+  AWS_CLI_PROFILE_ARG="--profile $AWS_PROFILE"
+fi
+
+AWS_CLI_REGION_ARG=""
+if [ -n "$AWS_REGION" ]; then
+  AWS_CLI_REGION_ARG="--region $AWS_REGION"
 fi
 
 # Find the latest Ubuntu LTS AMI (dynamic, futureproof, matches ssd and ssd-gp3, always picks latest xx.04 with even year)
 AMI=$(aws ec2 describe-images --owners 099720109477 \
   --filters 'Name=name,Values=ubuntu/images/hvm-ssd*/ubuntu-*-amd64-server-*' 'Name=state,Values=available' \
-  --region $AWS_REGION --profile $AWS_PROFILE \
+  $AWS_CLI_REGION_ARG $AWS_CLI_PROFILE_ARG \
   --query "Images[].{Name:Name,ImageId:ImageId}" \
   --output json | \
-  jq -r '
-    .[] | select(.Name? and (.Name | test("ubuntu-[a-z]+-[0-9]{2}\\.04-"))) |
-    .Name as $name |
-    capture("ubuntu-[a-z]+-(?<year>[0-9]{2})\\.04-") as $c |
-    select((($c.year | tonumber) % 2) == 0) |
-    [$name, .ImageId, ($c.year | tonumber)] | @tsv
-  ' | \
+  jq -r '.[] | select(.Name? and (.Name | test("ubuntu-[a-z]+-[0-9]{2}\\.04-"))) | .Name as $name | capture("ubuntu-[a-z]+-(?<year>[0-9]{2})\\.04-") as $c | select((($c.year | tonumber) % 2) == 0) | [$name, .ImageId, ($c.year | tonumber)] | @tsv' | \
   sort -k3,3n | tail -n1 | cut -f2
 )
 
