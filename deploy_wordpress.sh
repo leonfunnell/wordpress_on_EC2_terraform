@@ -36,7 +36,7 @@ if [ -n "$AWS_REGION" ]; then
   AWS_CLI_REGION_ARG="--region $AWS_REGION"
 fi
 
-# Find the latest Ubuntu LTS AMI (dynamic, futureproof, matches ssd and ssd-gp3, always picks latest xx.04 with even year)
+# Find the latest Ubuntu LTS AMI (even year, xx.04, latest date)
 AMI=$(aws ec2 describe-images --owners 099720109477 \
   --filters 'Name=name,Values=ubuntu/images/hvm-ssd*/ubuntu-*-amd64-server-*' 'Name=state,Values=available' \
   $AWS_CLI_REGION_ARG $AWS_CLI_PROFILE_ARG \
@@ -44,13 +44,14 @@ AMI=$(aws ec2 describe-images --owners 099720109477 \
   --output json | \
   jq -r '
     .[]
-    | select(.Name? and (.Name | type == "string") and (.Name | test("-[0-9]{2}\\.04-")))
+    | select(.Name | test("-[0-9]{2}\\.04-"))
     | .Name as $name
-    | capture("-([0-9]{2})\\.04-") as $c
-    | select((($c[1] | tonumber) % 2) == 0)
-    | [$name, .ImageId, ($c[1] | tonumber)]
+    | ($name | capture("-(?<year>[0-9]{2})\\.04-")) as $c
+    | select((($c.year | tonumber) % 2) == 0)
+    | ($name | capture("server-(?<fulldate>[0-9]{8})$")) as $d
+    | [$name, .ImageId, ($c.year | tonumber), $d.fulldate]
     | @tsv
-  ' | sort -k3,3n | tail -n1 | cut -f2
+  ' | sort -k4,4n | tail -n1 | cut -f2
 )
 
 echo "Selected Ubuntu LTS AMI: $AMI"
