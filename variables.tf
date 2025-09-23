@@ -43,3 +43,14 @@ variable "sftp_password" {
   description = "Password for SFTP access"
 }
 
+variable "ssh_allowed_cidr" {
+  type        = string
+  description = "CIDR block allowed to SSH (default: your IP)"
+  default     = "0.0.0.0/0"
+}
+
+variable "efs_allowed_cidr" {
+  type        = string
+  description = "CIDR block allowed to access EFS (default: VPC CIDR)"
+  default     = "0.0.0.0/0"
+}
