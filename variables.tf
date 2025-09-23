@@ -57,5 +57,6 @@ variable "efs_allowed_cidr" {
 
 variable "vpc_id" {
   type        = string
-  description = "The VPC ID to deploy resources into"
+  description = "The VPC ID to deploy resources into. If not set, the default VPC will be used."
+  default     = ""
 }
