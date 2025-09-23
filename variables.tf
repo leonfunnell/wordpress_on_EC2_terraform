@@ -57,6 +57,12 @@ variable "efs_allowed_cidr" {
 
 variable "vpc_id" {
   type        = string
-  description = "The VPC ID to deploy resources into. If not set, the default VPC will be used."
+  description = "The VPC ID to deploy resources into. If not set, a new VPC will be created."
+  default     = ""
+}
+
+variable "subnet_id" {
+  type        = string
+  description = "The Subnet ID to deploy resources into. If not set, a new subnet will be created."
   default     = ""
 }
