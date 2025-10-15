@@ -31,3 +31,6 @@ export ROUTE53_ZONE_ID=""      # e.g. Z123456ABCDEFG (leave blank for external D
 export OVERWRITE_DNS_RECORDS=false  # set true to allow Terraform to overwrite existing A/CNAME in Route53
 export USE_EXISTING_CERTIFICATE=false
 export EXISTING_CERTIFICATE_ARN=""  # required if USE_EXISTING_CERTIFICATE=true
+
+# EC2 instance type (default t3.micro). Examples: t3.small, t3.medium
+export INSTANCE_TYPE=t3.micro
