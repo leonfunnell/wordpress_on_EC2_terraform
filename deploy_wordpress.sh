@@ -72,6 +72,7 @@ TF_COMMON_VARS=(
   -var="db_password=$DB_PASSWORD"
   -var="sftp_user=$SFTP_USER"
   -var="sftp_password=$SFTP_PASSWORD"
+  -var="instance_type=${INSTANCE_TYPE:-t3.micro}"
 )
 
 # Optional CloudFront/domain vars (defaults if not set)
