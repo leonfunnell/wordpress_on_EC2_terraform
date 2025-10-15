@@ -30,6 +30,7 @@ resource "aws_route53_record" "cf_cert_validation" {
   type    = each.value.type
   ttl     = 60
   records = [each.value.value]
+  allow_overwrite = var.overwrite_dns_records
 }
 
 resource "aws_acm_certificate_validation" "cf" {
@@ -112,6 +113,8 @@ resource "aws_route53_record" "cf_alias" {
     zone_id                = aws_cloudfront_distribution.wp[0].hosted_zone_id
     evaluate_target_health = false
   }
+
+  allow_overwrite = var.overwrite_dns_records
 }
 
 # Helpful outputs for external DNS workflows
