@@ -1,6 +1,6 @@
 resource "aws_instance" "wordpress_server" {
   ami           = var.ami
-  instance_type = "t2.micro"
+  instance_type = var.instance_type
 
   iam_instance_profile = aws_iam_instance_profile.ec2_efs_profile.name
 
