@@ -66,3 +66,34 @@ variable "subnet_id" {
   description = "The Subnet ID to deploy resources into. If not set, a new subnet will be created."
   default     = ""
 }
+
+# CloudFront/SSL/Domain variables
+variable "enable_cloudfront" {
+  type        = bool
+  description = "Enable CloudFront distribution with custom domain and SSL"
+  default     = false
+}
+
+variable "domain_name" {
+  type        = string
+  description = "Fully qualified domain name for the site (e.g., www.example.com)"
+  default     = ""
+}
+
+variable "route53_zone_id" {
+  type        = string
+  description = "Optional Route53 public hosted zone ID for the domain. If empty, DNS records will be printed for manual creation on external DNS."
+  default     = ""
+}
+
+variable "use_existing_certificate" {
+  type        = bool
+  description = "If true, use an existing ACM certificate ARN (in us-east-1) instead of creating/validating one."
+  default     = false
+}
+
+variable "existing_certificate_arn" {
+  type        = string
+  description = "Existing ACM certificate ARN in us-east-1 to use with CloudFront (required if use_existing_certificate = true and no Route53 zone)."
+  default     = ""
+}
