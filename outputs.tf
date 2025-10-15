@@ -17,3 +17,14 @@ output "wordpress_site" {
   description = "URL for Wordpress"
   value       = "http://${aws_eip.wordpress_eip.public_ip}"
 }
+
+# CloudFront/Domain related outputs (may be null if disabled)
+output "cloudfront_domain_name" {
+  description = "CloudFront distribution domain name (use for external DNS CNAME)."
+  value       = try(aws_cloudfront_distribution.wp[0].domain_name, null)
+}
+
+output "cloudfront_hosted_zone_id" {
+  description = "CloudFront hosted zone ID (use for Route53 ALIAS records)."
+  value       = try(aws_cloudfront_distribution.wp[0].hosted_zone_id, null)
+}
