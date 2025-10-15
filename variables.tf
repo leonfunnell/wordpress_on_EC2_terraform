@@ -103,3 +103,10 @@ variable "existing_certificate_arn" {
   description = "Existing ACM certificate ARN in us-east-1 to use with CloudFront (required if use_existing_certificate = true and no Route53 zone)."
   default     = ""
 }
+
+# EC2 instance type
+variable "instance_type" {
+  type        = string
+  description = "EC2 instance type for the WordPress server (e.g., t3.micro, t3.small)."
+  default     = "t3.micro"
+}
