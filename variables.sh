@@ -19,16 +19,17 @@ if [ ! -f "${PROJECT_NAME}_sftp_password.txt" ]; then
 fi
 export SFTP_PASSWORD=$(cat "${PROJECT_NAME}_sftp_password.txt")
 
-# Optional: Domain/SSL/CloudFront
-# Set ENABLE_CLOUDFRONT=true to enable CloudFront + SSL for a custom domain.
-# If using Route53, set ROUTE53_ZONE_ID to your hosted zone ID to auto-create DNS and validate ACM.
-# If using external DNS, leave ROUTE53_ZONE_ID empty. Terraform will output the DNS records you must create
-# to validate the certificate. Once issued, set USE_EXISTING_CERTIFICATE=true and provide EXISTING_CERTIFICATE_ARN
-# (an ACM cert in us-east-1) to create the CloudFront distribution and finish setup.
-export ENABLE_CLOUDFRONT=false
+# Optional: Direct Route53 A record to EC2 EIP
+# Set DOMAIN_NAME and ROUTE53_ZONE_ID to create an A record to the instance's Elastic IP.
+# Set OVERWRITE_DNS_RECORDS=true to allow Terraform to replace an existing record of the same name.
 export DOMAIN_NAME=""          # e.g. www.example.com
-export ROUTE53_ZONE_ID=""      # e.g. Z123456ABCDEFG (leave blank for external DNS)
-export OVERWRITE_DNS_RECORDS=false  # set true to allow Terraform to overwrite existing A/CNAME in Route53
+export ROUTE53_ZONE_ID=""      # e.g. Z123456ABCDEFG (leave blank to skip Route53)
+export OVERWRITE_DNS_RECORDS=false
+
+# Optional: Domain/SSL/CloudFront (scaffolded, resources not included in this branch)
+# If using Route53, set ROUTE53_ZONE_ID to your hosted zone ID to auto-create DNS and validate ACM.
+# If using external DNS, Terraform will output the DNS records you must create to validate the certificate.
+export ENABLE_CLOUDFRONT=false
 export USE_EXISTING_CERTIFICATE=false
 export EXISTING_CERTIFICATE_ARN=""  # required if USE_EXISTING_CERTIFICATE=true
 

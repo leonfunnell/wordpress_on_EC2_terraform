@@ -33,21 +33,27 @@ To destroy (Don't do this in production!):
 - Required PHP modules: Installs php-xml and php-curl for UpdraftPlus and S3 support.
 - AWS CLI v2: Installed using the official AWS installer for compatibility.
 - Plugin auto-install: Popular plugins (UpdraftPlus, Elementor, Wordfence, etc.) are downloaded and installed automatically.
-- Optional: Custom domain + SSL + CloudFront (see below)
+- Optional: Custom domain + Route53 A-record to EC2 EIP
+- Optional: CPU credit mode control for burstable instances
 
-# Optional: Custom domain + SSL + CloudFront
-- Enable by setting in variables.sh:
-  - ENABLE_CLOUDFRONT=true
+# Optional: Point a custom domain at the EC2 EIP (Route53)
+- Set in variables.sh:
   - DOMAIN_NAME="www.example.com"
-  - If using Route53: set ROUTE53_ZONE_ID to your hosted zone ID. Terraform will:
-    - Create/validate an ACM cert in us-east-1
-    - Create a CloudFront distribution using your domain and the cert
-    - Create a Route53 ALIAS A record to CloudFront
-  - If using external DNS (not Route53):
-    - Leave ROUTE53_ZONE_ID empty
-    - First apply will output the ACM validation CNAMEs (certificate_dns_validation_records). Create them at your DNS provider and wait for issuance.
-    - Then set USE_EXISTING_CERTIFICATE=true and EXISTING_CERTIFICATE_ARN=<your us-east-1 cert ARN> and re-run deploy to create CloudFront.
-    - After CloudFront is created, create a CNAME from DOMAIN_NAME to the output cloudfront_domain_name (or ALIAS/ANAME at apex if your provider supports it).
+  - ROUTE53_ZONE_ID="Z123456ABCDEFG"
+- Terraform will create a Route53 A record pointing to the instance's Elastic IP.
+- If the record already exists and you want Terraform to overwrite it, set:
+  - OVERWRITE_DNS_RECORDS=true
+
+# Optional: Custom domain + SSL + CloudFront (future extension)
+- Variables are scaffolded for CloudFront/ACM usage but distribution/cert resources are not included in this branch.
+- If/when added, you will be able to:
+  - ENABLE_CLOUDFRONT=true
+  - Use Route53 for automatic DNS and ACM validation or external DNS with manual validation.
+
+# Optional: CPU credits (T-family burstable instances)
+- To use unlimited CPU credits on T-family instances (t2/t3/t3a/t4g), set in variables.sh:
+  - CPU_UNLIMITED=true
+- Default is false (standard credit mode). Has no effect on non-burstable instance families.
 
 # Extending
 - You can add CloudFront/SSL, Route53, or other AWS services via Terraform for production use.
