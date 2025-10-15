@@ -86,6 +86,12 @@ variable "route53_zone_id" {
   default     = ""
 }
 
+variable "overwrite_dns_records" {
+  type        = bool
+  description = "If true, allow Terraform to overwrite existing Route53 A/CNAME records for the domain."
+  default     = false
+}
+
 variable "use_existing_certificate" {
   type        = bool
   description = "If true, use an existing ACM certificate ARN (in us-east-1) instead of creating/validating one."
