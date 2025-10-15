@@ -34,3 +34,6 @@ export EXISTING_CERTIFICATE_ARN=""  # required if USE_EXISTING_CERTIFICATE=true
 
 # EC2 instance type (default t3.micro). Examples: t3.small, t3.medium
 export INSTANCE_TYPE=t3.micro
+
+# Enable unlimited CPU credits for burstable instances (t2/t3/t3a/t4g). Default: false
+export CPU_UNLIMITED=false

@@ -1,13 +1,27 @@
+locals {
+  burstable_families = ["t2", "t3", "t3a", "t4g"]
+  instance_family    = split(".", var.instance_type)[0]
+  is_burstable       = contains(local.burstable_families, local.instance_family)
+}
+
 resource "aws_instance" "wordpress_server" {
   ami           = var.ami
   instance_type = var.instance_type
+
+  # Optional CPU credits for burstable instances
+  dynamic "credit_specification" {
+    for_each = var.cpu_unlimited && local.is_burstable ? [1] : []
+    content {
+      cpu_credits = "unlimited"
+    }
+  }
 
   iam_instance_profile = aws_iam_instance_profile.ec2_efs_profile.name
 
   key_name = aws_key_pair.deployer.key_name
 
   vpc_security_group_ids = [aws_security_group.wordpress_sg.id]
-  subnet_id = local.effective_subnet_id
+  subnet_id              = local.effective_subnet_id
 
   depends_on = [aws_efs_file_system.wordpress_efs]
 

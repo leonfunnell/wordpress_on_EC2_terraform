@@ -110,3 +110,10 @@ variable "instance_type" {
   description = "EC2 instance type for the WordPress server (e.g., t3.micro, t3.small)."
   default     = "t3.micro"
 }
+
+# Optional: enable unlimited CPU credits for burstable instances (t2, t3, t3a, t4g)
+variable "cpu_unlimited" {
+  type        = bool
+  description = "If true, set CPU credit specification to 'unlimited' for T-family burstable instance types."
+  default     = false
+}
