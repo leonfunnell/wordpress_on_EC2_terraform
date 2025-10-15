@@ -61,35 +61,43 @@ if [ -z "$AMI" ]; then
   exit 1
 fi
 
+# Terraform common vars
+TF_COMMON_VARS=(
+  -var="aws_profile=$AWS_PROFILE"
+  -var="aws_region=$AWS_REGION"
+  -var="ami=$AMI"
+  -var="project_name=$PROJECT_NAME"
+  -var="db_name=$DB_NAME"
+  -var="db_user=$DB_USER"
+  -var="db_password=$DB_PASSWORD"
+  -var="sftp_user=$SFTP_USER"
+  -var="sftp_password=$SFTP_PASSWORD"
+)
+
+# Optional CloudFront/domain vars (defaults if not set)
+TF_CF_VARS=(
+  -var="enable_cloudfront=${ENABLE_CLOUDFRONT:-false}"
+  -var="domain_name=${DOMAIN_NAME:-}"
+  -var="route53_zone_id=${ROUTE53_ZONE_ID:-}"
+  -var="use_existing_certificate=${USE_EXISTING_CERTIFICATE:-false}"
+  -var="existing_certificate_arn=${EXISTING_CERTIFICATE_ARN:-}"
+)
+
 case "$1" in
 --destroy)
     echo "Destroying the Wordpress infrastructure..."
     terraform init
     terraform destroy \
-        -var="aws_profile=$AWS_PROFILE" \
-        -var="aws_region=$AWS_REGION" \
-        -var="ami=$AMI" \
-        -var="project_name=$PROJECT_NAME" \
-        -var="db_name=$DB_NAME" \
-        -var="db_user=$DB_USER" \
-        -var="db_password=$DB_PASSWORD" \
-        -var="sftp_user=$SFTP_USER" \
-        -var="sftp_password=$SFTP_PASSWORD" \
+        "${TF_COMMON_VARS[@]}" \
+        "${TF_CF_VARS[@]}" \
         -auto-approve
     ;;
 *)
     echo "Deploying the Wordpress infrastructure..."
     terraform init
     terraform apply \
-        -var="aws_profile=$AWS_PROFILE" \
-        -var="aws_region=$AWS_REGION" \
-        -var="ami=$AMI" \
-        -var="project_name=$PROJECT_NAME" \
-        -var="db_name=$DB_NAME" \
-        -var="db_user=$DB_USER" \
-        -var="db_password=$DB_PASSWORD" \
-        -var="sftp_user=$SFTP_USER" \
-        -var="sftp_password=$SFTP_PASSWORD" \
+        "${TF_COMMON_VARS[@]}" \
+        "${TF_CF_VARS[@]}" \
         -auto-approve
     ;;
 esac
