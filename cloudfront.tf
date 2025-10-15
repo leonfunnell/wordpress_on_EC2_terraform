@@ -47,8 +47,9 @@ locals {
 
 # CloudFront distribution (created only when we have a cert path: either existing ARN or Route53-managed validation)
 resource "aws_cloudfront_distribution" "wp" {
-  count   = local.cf_enabled && (var.use_existing_certificate || local.use_r53) ? 1 : 0
-  enabled = true
+  count      = local.cf_enabled && (var.use_existing_certificate || local.use_r53) ? 1 : 0
+  enabled    = true
+  depends_on = [aws_acm_certificate_validation.cf]
 
   aliases = [var.domain_name]
 
