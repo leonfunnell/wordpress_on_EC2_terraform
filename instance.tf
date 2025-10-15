@@ -40,6 +40,7 @@ resource "aws_instance" "wordpress_server" {
       echo export SFTP_PASSWORD=${var.sftp_password} >> server_variables.sh
       echo export EFS_ID=${aws_efs_file_system.wordpress_efs.id} >> server_variables.sh
       echo export EFS_DNSNAME=${aws_efs_file_system.wordpress_efs.dns_name} >> server_variables.sh
+      echo export EFS_IP=${aws_efs_mount_target.wordpress_efs_mount.ip_address} >> server_variables.sh
       echo export AWS_REGION=${var.aws_region} >> server_variables.sh
       echo export PUBLIC_IP=${self.public_ip} >> server_variables.sh
     EOT

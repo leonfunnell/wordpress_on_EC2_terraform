@@ -22,24 +22,37 @@ apt-get -yq update
 echo -e ${RED}installing nfs-common...
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install nfs-common
 
-# Wait for EFS DNS to resolve (max 2 minutes)
-for i in {1..24}; do
-  getent hosts $EFS_DNSNAME && break
+# Determine target for EFS mount (prefer DNS, fallback to IP if DNS doesn't resolve)
+MOUNT_TARGET="$EFS_DNSNAME"
+for i in {1..36}; do # wait up to 3 minutes for DNS
+  if getent hosts "$EFS_DNSNAME" >/dev/null 2>&1; then
+    break
+  fi
   echo "Waiting for EFS DNS to resolve..."
   sleep 5
+  if [ $i -eq 36 ] && [ -n "$EFS_IP" ]; then
+    echo "EFS DNS still not resolvable; falling back to mount target IP $EFS_IP"
+    MOUNT_TARGET="$EFS_IP"
+  fi
 done
 
 # Ensure mount point exists before mounting
 mkdir -p /var/www/html
 
-# Retry EFS mount up to 5 times
-for i in {1..5}; do
-  mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport $EFS_DNSNAME:/  /var/www/html && break
+# Retry EFS mount up to 10 times
+for i in {1..10}; do
+  mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${MOUNT_TARGET}:/  /var/www/html && break
   echo "Retrying EFS mount..."
-  sleep 5
+  sleep 6
+  # If first attempts used DNS and it's not resolving, switch to IP if available
+  if [ "$MOUNT_TARGET" = "$EFS_DNSNAME" ] && ! getent hosts "$EFS_DNSNAME" >/dev/null 2>&1 && [ -n "$EFS_IP" ]; then
+    echo "Switching to EFS mount target IP $EFS_IP"
+    MOUNT_TARGET="$EFS_IP"
+  fi
 done
 
-mount | grep /var/www/html
+mount | grep /var/www/html || { echo "EFS mount failed"; exit 1; }
+
 echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl
 
@@ -101,7 +114,7 @@ EOT
 
 # Mount NFS and configure fstab
 echo -e ${RED}mounting NFS:
-echo "$EFS_DNSNAME:/ /var/www/html nfs4 defaults,_netdev 0 0" >> /etc/fstab
+echo "${MOUNT_TARGET}:/ /var/www/html nfs4 defaults,_netdev 0 0" >> /etc/fstab
 mount -a
 echo -e ${RED}result of mount NFS:
 mount | grep /var/www/html && echo -e ${RED}NFS Mounted successfully!
