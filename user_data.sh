@@ -19,7 +19,7 @@ apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold
 echo -e ${RED}running apt-get update...
 apt-get -yq update
 
-echo -e ${RED}installing nfs-common...
+echo -e ${RED}installing nfs-common curl unzip...
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install nfs-common curl unzip
 
 # Determine target for EFS mount (prefer DNS, fallback to IP if DNS doesn't resolve)
@@ -55,10 +55,10 @@ mount | grep /var/www/html || { echo "EFS mount failed"; exit 1; }
 echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd php-xml php-curl
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd php-xml php-curl
 
-# Install AWS CLI v2
+# Install/Update AWS CLI v2 (non-fatal if already installed)
 curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
 unzip -o /tmp/awscliv2.zip -d /tmp
-sudo /tmp/aws/install
+sudo /tmp/aws/install --update || true
 
 a2enmod rewrite || true
 
