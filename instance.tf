@@ -77,7 +77,6 @@ resource "null_resource" "configure_server" {
     inline = [
       "chmod +x /home/ubuntu/user_data.sh",
       "chmod +x /home/ubuntu/variables.sh",
-      "cd /home/ubuntu",
       "sudo /home/ubuntu/user_data.sh"
     ]
   }
