@@ -54,10 +54,9 @@ done
 mount | grep /var/www/html || { echo "EFS mount failed"; exit 1; }
 
 echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl
-apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl curl
 
 # Install AWS CLI v2
-sudo apt-get install -y curl
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
 unzip -o /tmp/awscliv2.zip -d /tmp
 sudo /tmp/aws/install
@@ -70,59 +69,70 @@ find /var/www/html -type f -exec chmod 644 {} \;
 # Ensure /tmp is world-writable with sticky bit
 chmod 1777 /tmp
 
-# Generate wp-config.php if it doesn't exist
+# Generate wp-config.php safely using sample + official salts
 if [ ! -f /var/www/html/wp-config.php ]; then
-cat <<EOF > /var/www/html/wp-config.php
+  if [ -f /var/www/html/wp-config-sample.php ]; then
+    cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+  else
+    # Minimal base if sample missing
+    cat >/var/www/html/wp-config.php <<'PHP'
 <?php
-define('DB_NAME', '${DB_NAME}');
-define('DB_USER', '${DB_USER}');
-define('DB_PASSWORD', '${DB_PASSWORD}');
-define('DB_HOST', 'localhost');
-define('DB_CHARSET', 'utf8');
-define('DB_COLLATE', '');
-define('FS_METHOD', 'direct');
+/* Auto-generated */
+PHP
+  fi
 
-// Authentication Unique Keys and Salts.
+  # Fill DB credentials
+  sed -i "s/database_name_here/${DB_NAME}/" /var/www/html/wp-config.php
+  sed -i "s/username_here/${DB_USER}/" /var/www/html/wp-config.php
+  sed -i "s/password_here/${DB_PASSWORD}/" /var/www/html/wp-config.php
 
-define('AUTH_KEY',         '$(openssl rand -base64 32)');
-define('SECURE_AUTH_KEY',  '$(openssl rand -base64 32)');
-define('LOGGED_IN_KEY',    '$(openssl rand -base64 32)');
-define('NONCE_KEY',        '$(openssl rand -base64 32)');
-define('AUTH_SALT',        '$(openssl rand -base64 32)');
-define('SECURE_AUTH_SALT', '$(openssl rand -base64 32)');
-define('LOGGED_IN_SALT',   '$(openssl rand -base64 32)');
-define('NONCE_SALT',       '$(openssl rand -base64 32)');
+  # Ensure FS_METHOD and FTP creds exist (before the stop-editing line)
+  awk '
+    BEGIN{inserted=0}
+    /\* That\'s all, stop editing!/ && !inserted {
+      print "define(\'FS_METHOD\', \'direct\');";
+      print "define(\'FTP_HOST\', \'localhost\');";
+      print "define(\'FTP_USER\', \'" ENVIRON["SFTP_USER"] "\');";
+      print "define(\'FTP_PASS\', \'" ENVIRON["SFTP_PASSWORD"] "\');";
+      inserted=1
+    }
+    {print}
+  ' /var/www/html/wp-config.php > /var/www/html/wp-config.php.tmp && mv /var/www/html/wp-config.php.tmp /var/www/html/wp-config.php
 
+  # Replace the default salt block with fresh salts from WordPress.org
+  sed -i "/AUTH_KEY/d;/SECURE_AUTH_KEY/d;/LOGGED_IN_KEY/d;/NONCE_KEY/d;/AUTH_SALT/d;/SECURE_AUTH_SALT/d;/LOGGED_IN_SALT/d;/NONCE_SALT/d" /var/www/html/wp-config.php
+  awk '
+    /\* That\'s all, stop editing!/ && !done {
+      system("curl -s https://api.wordpress.org/secret-key/1.1/salt/")
+      done=1
+    }
+    {print}
+  ' /var/www/html/wp-config.php > /var/www/html/wp-config.php.tmp && mv /var/www/html/wp-config.php.tmp /var/www/html/wp-config.php
+
+  # If minimal base, finish required bits
+  if ! grep -q "ABSPATH" /var/www/html/wp-config.php; then
+    cat >>/var/www/html/wp-config.php <<'PHP'
 $table_prefix  = 'wp_';
-
 define('WP_DEBUG', false);
-
 if ( !defined('ABSPATH') )
-    define('ABSPATH', dirname(__FILE__) . '/');
-
+  define('ABSPATH', __DIR__ . '/');
 require_once(ABSPATH . 'wp-settings.php');
-EOF
+PHP
+  fi
 fi
 
-# Add FTP config for plugin/theme updates
-cat <<EOT >> /var/www/html/wp-config.php
-
-define('FTP_HOST', 'localhost');
-define('FTP_USER', '${SFTP_USER}');
-define('FTP_PASS', '${SFTP_PASSWORD}');
-EOT
-
-# Mount NFS and configure fstab
+# Mount NFS in fstab
 echo -e ${RED}mounting NFS:
 echo "${MOUNT_TARGET}:/ /var/www/html nfs4 defaults,_netdev 0 0" >> /etc/fstab
 mount -a
 echo -e ${RED}result of mount NFS:
 mount | grep /var/www/html && echo -e ${RED}NFS Mounted successfully!
 
+# Configure MySQL
 echo -e ${RED}Configure MySQL...
 mysql -u root <<-EOF
-CREATE DATABASE $DB_NAME;
-CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
+CREATE DATABASE IF NOT EXISTS $DB_NAME;
+CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
 GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 EOF
@@ -130,22 +140,28 @@ EOF
 echo "<Directory /var/www/html/>" | tee -a /etc/apache2/sites-available/000-default.conf
 echo "    DirectoryIndex index.php index.html" | tee -a /etc/apache2/sites-available/000-default.conf
 echo "</Directory>" | tee -a /etc/apache2/sites-available/000-default.conf
+
+# Ensure rewrite module
+a2enmod rewrite || true
 systemctl restart apache2
 
-echo -e ${RED}Install WordPress...
-wget -c http://wordpress.org/latest.tar.gz
-tar -xzf latest.tar.gz
-mv wordpress/* /var/www/html/
+# Install WordPress core files if not present
+if [ ! -f /var/www/html/wp-settings.php ]; then
+  echo -e ${RED}Install WordPress...
+  wget -q -c http://wordpress.org/latest.tar.gz
+  tar -xzf latest.tar.gz
+  rsync -a wordpress/ /var/www/html/
+fi
 
 # Download plugins to $TMP
-wget https://downloads.wordpress.org/plugin/cookie-notice.2.4.8.zip
-wget https://downloads.wordpress.org/plugin/all-in-one-wp-migration.7.75.zip 
-wget https://downloads.wordpress.org/plugin/elementor.3.13.4.zip
-wget https://downloads.wordpress.org/plugin/updraftplus.1.23.4.zip
-wget https://downloads.wordpress.org/plugin/wordfence.7.9.3.zip
-wget https://downloads.wordpress.org/plugin/wordpress-importer.0.8.1.zip
+wget -q https://downloads.wordpress.org/plugin/cookie-notice.2.4.8.zip
+wget -q https://downloads.wordpress.org/plugin/all-in-one-wp-migration.7.75.zip 
+wget -q https://downloads.wordpress.org/plugin/elementor.3.13.4.zip
+wget -q https://downloads.wordpress.org/plugin/updraftplus.1.23.4.zip
+wget -q https://downloads.wordpress.org/plugin/wordfence.7.9.3.zip
+wget -q https://downloads.wordpress.org/plugin/wordpress-importer.0.8.1.zip
 
 # Unzip plugins into the plugins directory
 for zip in $TMP/*.zip; do
-  unzip "$zip" -d /var/www/html/wp-content/plugins/
+  unzip -o -q "$zip" -d /var/www/html/wp-content/plugins/
 done
