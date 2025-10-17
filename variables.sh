@@ -19,19 +19,20 @@ if [ ! -f "${PROJECT_NAME}_sftp_password.txt" ]; then
 fi
 export SFTP_PASSWORD=$(cat "${PROJECT_NAME}_sftp_password.txt")
 
-# Optional: Direct Route53 A record to EC2 EIP
-# Set DOMAIN_NAME and ROUTE53_ZONE_ID to create an A record to the instance's Elastic IP.
+# Optional: Domain + Route53
+# Set DOMAIN_NAME and ROUTE53_ZONE_ID to create DNS records.
 # Set OVERWRITE_DNS_RECORDS=true to allow Terraform to replace an existing record of the same name.
 export DOMAIN_NAME=""          # e.g. www.example.com
 export ROUTE53_ZONE_ID=""      # e.g. Z123456ABCDEFG (leave blank to skip Route53)
 export OVERWRITE_DNS_RECORDS=false
 
-# Optional: Domain/SSL/CloudFront (scaffolded, resources not included in this branch)
-# If using Route53, set ROUTE53_ZONE_ID to your hosted zone ID to auto-create DNS and validate ACM.
-# If using external DNS, Terraform will output the DNS records you must create to validate the certificate.
-export ENABLE_CLOUDFRONT=false
-export USE_EXISTING_CERTIFICATE=false
-export EXISTING_CERTIFICATE_ARN=""  # required if USE_EXISTING_CERTIFICATE=true
+# Optional: Use an ALB (recommended over CloudFront for WordPress dynamic sites)
+# If ENABLE_ALB=true and DOMAIN_NAME set, Terraform will create an ALB and (optionally) HTTPS listener.
+# To enable HTTPS, either:
+#  - set ALB_CERTIFICATE_ARN to an ACM cert ARN in the same region; or
+#  - leave it blank and provide ROUTE53_ZONE_ID so Terraform can request/validate a new certificate via DNS.
+export ENABLE_ALB=false
+export ALB_CERTIFICATE_ARN=""
 
 # EC2 instance type (default t3.micro). Examples: t3.small, t3.medium
 export INSTANCE_TYPE=t3.micro
