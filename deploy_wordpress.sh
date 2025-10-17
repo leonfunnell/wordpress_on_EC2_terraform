@@ -85,21 +85,44 @@ TF_DOMAIN_VARS=(
   -var="alb_certificate_arn=${ALB_CERTIFICATE_ARN:-}"
 )
 
+# Optional: convert ALB_SUBNET_IDS_CSV into a tfvars.json file to avoid quoting issues
+TF_TEMP_VARS_FILE=""
+if [ -n "${ALB_SUBNET_IDS_CSV:-}" ]; then
+  IFS=',' read -ra SUBNETS_ARR <<< "$ALB_SUBNET_IDS_CSV"
+  JSON_LIST=$(printf '"%s",' "${SUBNETS_ARR[@]}")
+  JSON_LIST="[${JSON_LIST%,}]"
+  TF_TEMP_VARS_FILE=".alb_subnets.auto.tfvars.json"
+  echo "{ \"alb_subnet_ids\": ${JSON_LIST} }" > "$TF_TEMP_VARS_FILE"
+  TF_VAR_FILE_ARG=( -var-file="$TF_TEMP_VARS_FILE" )
+else
+  TF_VAR_FILE_ARG=()
+fi
+
+apply_stack() {
+  terraform init
+  terraform apply \
+      "${TF_COMMON_VARS[@]}" \
+      "${TF_DOMAIN_VARS[@]}" \
+      "${TF_VAR_FILE_ARG[@]}" \
+      -auto-approve
+}
+
+destroy_stack() {
+  terraform init
+  terraform destroy \
+      "${TF_COMMON_VARS[@]}" \
+      "${TF_DOMAIN_VARS[@]}" \
+      "${TF_VAR_FILE_ARG[@]}" \
+      -auto-approve
+}
+
 case "$1" in
 --destroy)
     echo "Destroying the Wordpress infrastructure..."
-    terraform init
-    terraform destroy \
-        "${TF_COMMON_VARS[@]}" \
-        "${TF_DOMAIN_VARS[@]}" \
-        -auto-approve
+    destroy_stack
     ;;
 *)
     echo "Deploying the Wordpress infrastructure..."
-    terraform init
-    terraform apply \
-        "${TF_COMMON_VARS[@]}" \
-        "${TF_DOMAIN_VARS[@]}" \
-        -auto-approve
+    apply_stack
     ;;
 esac
