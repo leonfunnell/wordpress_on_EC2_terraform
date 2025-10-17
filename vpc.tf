@@ -54,11 +54,9 @@ resource "aws_route_table_association" "auto" {
 
 # Locals
 locals {
-  effective_vpc_id     = var.vpc_id != "" ? var.vpc_id : aws_vpc.auto[0].id
+  effective_vpc_id    = var.vpc_id != "" ? var.vpc_id : aws_vpc.auto[0].id
   # For the instance we still use a single subnet (first one)
-  effective_subnet_id  = var.vpc_id != "" ? var.subnet_id : aws_subnet.auto[0].id
+  effective_subnet_id = var.vpc_id != "" ? var.subnet_id : aws_subnet.auto[0].id
   # For ALB we need two subnets; if using existing VPC, expect alb_subnet_ids to be provided
-  effective_subnet_ids = var.vpc_id != ""
-    ? (length(var.alb_subnet_ids) > 0 ? var.alb_subnet_ids : (var.subnet_id != "" ? [var.subnet_id] : []))
-    : [for s in aws_subnet.auto : s.id]
+  effective_subnet_ids = var.vpc_id != "" ? (length(var.alb_subnet_ids) > 0 ? var.alb_subnet_ids : (var.subnet_id != "" ? [var.subnet_id] : [])) : [for s in aws_subnet.auto : s.id]
 }
