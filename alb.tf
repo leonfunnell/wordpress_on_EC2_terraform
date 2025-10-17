@@ -1,7 +1,10 @@
 # Application Load Balancer + optional ACM certificate (regional)
 
 locals {
-  alb_enabled = var.enable_alb
+  alb_enabled      = var.enable_alb
+  name_sanitized   = regexreplace(var.project_name, "[^a-zA-Z0-9-]", "-")
+  alb_name         = substr("${local.name_sanitized}-alb", 0, 32)
+  tg_name          = substr("${local.name_sanitized}-tg", 0, 32)
 }
 
 # ALB security group
@@ -43,7 +46,7 @@ resource "aws_security_group" "alb_sg" {
 # ALB
 resource "aws_lb" "wp" {
   count              = local.alb_enabled ? 1 : 0
-  name               = "${var.project_name}-alb"
+  name               = local.alb_name
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg[0].id]
@@ -58,7 +61,7 @@ resource "aws_lb" "wp" {
 # Target group for the instance
 resource "aws_lb_target_group" "wp" {
   count    = local.alb_enabled ? 1 : 0
-  name     = "${var.project_name}-tg"
+  name     = local.tg_name
   port     = 80
   protocol = "HTTP"
   vpc_id   = local.effective_vpc_id
