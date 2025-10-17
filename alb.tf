@@ -1,10 +1,10 @@
 # Application Load Balancer + optional ACM certificate (regional)
 
 locals {
-  alb_enabled      = var.enable_alb
-  name_sanitized   = regexreplace(var.project_name, "[^a-zA-Z0-9-]", "-")
-  alb_name         = substr("${local.name_sanitized}-alb", 0, 32)
-  tg_name          = substr("${local.name_sanitized}-tg", 0, 32)
+  alb_enabled = var.enable_alb
+  base_name   = replace(replace(var.project_name, "_", "-"), " ", "-")
+  alb_name    = substr("${local.base_name}-alb", 0, 32)
+  tg_name     = substr("${local.base_name}-tg", 0, 32)
 }
 
 # ALB security group
