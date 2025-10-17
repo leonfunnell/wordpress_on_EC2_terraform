@@ -13,13 +13,19 @@ output "ssh_command" {
   value       = "ssh -i wordpress_key.pem ubuntu@${aws_eip.wordpress_eip.public_ip}"
 }
 
-output "wordpress_site" {
-  description = "URL for Wordpress"
-  value       = "http://${aws_eip.wordpress_eip.public_ip}"
+# Primary site URL depending on ALB+domain or EIP fallback
+output "site_url" {
+  description = "Primary URL for WordPress"
+  value       = var.enable_alb && var.domain_name != "" ? (var.alb_certificate_arn != "" || (length(aws_acm_certificate.alb) > 0) ? "https://${var.domain_name}" : "http://${var.domain_name}") : "http://${aws_eip.wordpress_eip.public_ip}"
 }
 
-# CloudFront/Domain related outputs (may be null if disabled)
-output "cloudfront_hosted_zone_id" {
-  description = "CloudFront hosted zone ID (use for Route53 ALIAS records)."
-  value       = try(aws_cloudfront_distribution.wp[0].hosted_zone_id, null)
+# ALB outputs
+output "alb_dns_name" {
+  description = "ALB DNS name (if enabled)"
+  value       = try(aws_lb.wp[0].dns_name, null)
+}
+
+output "alb_zone_id" {
+  description = "ALB hosted zone ID (for Route53 alias)"
+  value       = try(aws_lb.wp[0].zone_id, null)
 }
