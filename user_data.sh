@@ -29,6 +29,7 @@ TMP=$(mktemp -d)
 cd "$TMP"
 
 echo "Step: apt update/upgrade"
+apthold() { apt-mark hold "$@" || true; }
 apt-get -yq update
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq upgrade
 apt-get -yq update
@@ -72,10 +73,30 @@ for i in {1..10}; do
 done
 mount | grep /var/www/html
 
-echo "Step: install LAMP + tools"
+# Install LAMP stack with PHP 8.3
+# Install base services and prereqs first
+echo "Step: install Apache/MySQL/VSFTPD + prereqs"
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install \
-  apache2 mysql-server php libapache2-mod-php php-mysql vsftpd php-xml php-curl
+  apache2 mysql-server vsftpd software-properties-common
 
+# Ensure PHP 8.3 is available and installed
+echo "Step: ensure PHP 8.3"
+if ! apt-cache show php8.3 >/dev/null 2>&1; then
+  add-apt-repository -y ppa:ondrej/php
+  apt-get -yq update
+fi
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install \
+  php8.3 libapache2-mod-php8.3 php8.3-mysql php8.3-xml php8.3-curl
+
+# Make sure Apache uses PHP 8.3
+a2dismod php7.4 php8.0 php8.1 php8.2 || true
+a2enmod php8.3 || true
+update-alternatives --set php /usr/bin/php8.3 || true
+
+# Optional: verify PHP version
+php -v || true
+
+# Install/update AWS CLI v2
 echo "Step: install/update AWS CLI v2"
 curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
 unzip -o /tmp/awscliv2.zip -d /tmp
