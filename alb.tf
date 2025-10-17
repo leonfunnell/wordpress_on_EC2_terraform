@@ -89,13 +89,7 @@ resource "aws_acm_certificate" "alb" {
 }
 
 resource "aws_route53_record" "alb_cert_validation" {
-  for_each = local.alb_enabled && var.domain_name != "" && var.route53_zone_id != "" && var.alb_certificate_arn == ""
-    ? { for dvo in aws_acm_certificate.alb[0].domain_validation_options : dvo.domain_name => {
-        name  = dvo.resource_record_name
-        type  = dvo.resource_record_type
-        value = dvo.resource_record_value
-      } }
-    : {}
+  for_each = (local.alb_enabled && var.domain_name != "" && var.route53_zone_id != "" && var.alb_certificate_arn == "") ? { for dvo in aws_acm_certificate.alb[0].domain_validation_options : dvo.domain_name => { name = dvo.resource_record_name, type = dvo.resource_record_type, value = dvo.resource_record_value } } : {}
   allow_overwrite = var.overwrite_dns_records
   zone_id         = var.route53_zone_id
   name            = each.value.name
