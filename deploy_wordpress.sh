@@ -76,14 +76,13 @@ TF_COMMON_VARS=(
   -var="cpu_unlimited=${CPU_UNLIMITED:-false}"
 )
 
-# Optional CloudFront/domain vars (defaults if not set)
-TF_CF_VARS=(
-  -var="enable_cloudfront=${ENABLE_CLOUDFRONT:-false}"
+# Domain/Route53/ALB vars
+TF_DOMAIN_VARS=(
   -var="domain_name=${DOMAIN_NAME:-}"
   -var="route53_zone_id=${ROUTE53_ZONE_ID:-}"
   -var="overwrite_dns_records=${OVERWRITE_DNS_RECORDS:-false}"
-  -var="use_existing_certificate=${USE_EXISTING_CERTIFICATE:-false}"
-  -var="existing_certificate_arn=${EXISTING_CERTIFICATE_ARN:-}"
+  -var="enable_alb=${ENABLE_ALB:-false}"
+  -var="alb_certificate_arn=${ALB_CERTIFICATE_ARN:-}"
 )
 
 case "$1" in
@@ -92,7 +91,7 @@ case "$1" in
     terraform init
     terraform destroy \
         "${TF_COMMON_VARS[@]}" \
-        "${TF_CF_VARS[@]}" \
+        "${TF_DOMAIN_VARS[@]}" \
         -auto-approve
     ;;
 *)
@@ -100,7 +99,7 @@ case "$1" in
     terraform init
     terraform apply \
         "${TF_COMMON_VARS[@]}" \
-        "${TF_CF_VARS[@]}" \
+        "${TF_DOMAIN_VARS[@]}" \
         -auto-approve
     ;;
 esac
