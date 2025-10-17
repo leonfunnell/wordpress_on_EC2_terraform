@@ -20,19 +20,21 @@ fi
 export SFTP_PASSWORD=$(cat "${PROJECT_NAME}_sftp_password.txt")
 
 # Optional: Domain + Route53
-# Set DOMAIN_NAME and ROUTE53_ZONE_ID to create DNS records.
-# Set OVERWRITE_DNS_RECORDS=true to allow Terraform to replace an existing record of the same name.
 export DOMAIN_NAME=""          # e.g. www.example.com
 export ROUTE53_ZONE_ID=""      # e.g. Z123456ABCDEFG (leave blank to skip Route53)
 export OVERWRITE_DNS_RECORDS=false
 
-# Optional: Use an ALB (recommended over CloudFront for WordPress dynamic sites)
+# Optional: Use an ALB (recommended for WordPress dynamic sites)
 # If ENABLE_ALB=true and DOMAIN_NAME set, Terraform will create an ALB and (optionally) HTTPS listener.
 # To enable HTTPS, either:
 #  - set ALB_CERTIFICATE_ARN to an ACM cert ARN in the same region; or
 #  - leave it blank and provide ROUTE53_ZONE_ID so Terraform can request/validate a new certificate via DNS.
 export ENABLE_ALB=false
 export ALB_CERTIFICATE_ARN=""
+
+# If deploying to an existing VPC, provide at least two public subnets for ALB
+# Comma-separated list: e.g. "subnet-aaa,subnet-bbb". Leave empty to let Terraform create its own VPC/subnets.
+export ALB_SUBNET_IDS_CSV=""
 
 # EC2 instance type (default t3.micro). Examples: t3.small, t3.medium
 export INSTANCE_TYPE=t3.micro
