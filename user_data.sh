@@ -124,8 +124,7 @@ cat >/tmp/wp.url <<EOF
 define('WP_HOME', '${EXTERNAL_URL}');
 define('WP_SITEURL', '${EXTERNAL_URL}');
 // Respect ALB/X-Forwarded-Proto so is_ssl() works and assets load over HTTPS
-if (isset(
-$_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { $_SERVER['HTTPS'] = 'on'; }
+if (isset(\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { \$_SERVER['HTTPS'] = 'on'; }
 if (!defined('FORCE_SSL_ADMIN')) define('FORCE_SSL_ADMIN', true);
 EOF
 sed -i "/Happy publishing\./r /tmp/wp.url" /var/www/html/wp-config.php || true
