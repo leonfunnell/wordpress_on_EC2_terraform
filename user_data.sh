@@ -29,6 +29,7 @@ TMP=$(mktemp -d)
 cd "$TMP"
 
 echo "Step: apt update/upgrade"
+apthold() { apt-mark hold "$@" || true; }
 apt-get -yq update
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq upgrade
 apt-get -yq update
@@ -72,10 +73,43 @@ for i in {1..10}; do
 done
 mount | grep /var/www/html
 
-echo "Step: install LAMP + tools"
+# Install base services and prereqs first
+echo "Step: install Apache/MySQL/VSFTPD + prereqs"
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install \
-  apache2 mysql-server php libapache2-mod-php php-mysql vsftpd php-xml php-curl
+  apache2 mysql-server vsftpd software-properties-common
 
+# Ensure the Ondrej PHP PPA is available (for latest PHP series)
+echo "Step: add PHP PPA if missing and refresh apt"
+if ! grep -R "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | grep -q .; then
+  add-apt-repository -y ppa:ondrej/php
+  apt-get -yq update
+fi
+
+# Determine the latest available PHP series (e.g., 8.3, 8.4)
+echo "Step: detect latest PHP series"
+LATEST_SERIES=$(apt-cache search -n '^php[0-9]+\.[0-9]+-common$' | awk '{print $1}' | sed -E 's/^php([0-9]+\.[0-9]+)-common/\1/' | sort -V | tail -n1)
+if [ -z "$LATEST_SERIES" ]; then
+  # Fallback if search fails; default to distro PHP meta
+  echo "WARN: Could not detect latest PHP series; installing distro 'php' meta"
+  apt-get -yq install php libapache2-mod-php php-mysql php-xml php-curl
+  LATEST_SERIES=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "")
+else
+  # Install matching PHP packages for the latest series
+  apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install \
+    php${LATEST_SERIES} libapache2-mod-php${LATEST_SERIES} php${LATEST_SERIES}-mysql php${LATEST_SERIES}-xml php${LATEST_SERIES}-curl
+fi
+
+# Make sure Apache and CLI use the selected PHP series
+for v in 7.4 8.0 8.1 8.2 8.3 8.4; do a2dismod php${v} || true; done
+if [ -n "$LATEST_SERIES" ]; then
+  a2enmod php${LATEST_SERIES} || true
+  update-alternatives --set php /usr/bin/php${LATEST_SERIES} || true
+fi
+
+# Optional: verify PHP version
+php -v || true
+
+# Install/update AWS CLI v2
 echo "Step: install/update AWS CLI v2"
 curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
 unzip -o /tmp/awscliv2.zip -d /tmp
