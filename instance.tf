@@ -43,6 +43,8 @@ resource "aws_instance" "wordpress_server" {
       echo export EFS_IP=${aws_efs_mount_target.wordpress_efs_mount.ip_address} >> server_variables.sh
       echo export AWS_REGION=${var.aws_region} >> server_variables.sh
       echo export PUBLIC_IP=${self.public_ip} >> server_variables.sh
+      echo export DOMAIN_NAME=${var.domain_name} >> server_variables.sh
+      echo export ENABLE_ALB=${var.enable_alb} >> server_variables.sh
     EOT
   }
 
