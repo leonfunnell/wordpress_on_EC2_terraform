@@ -61,6 +61,18 @@ if [ -z "$AMI" ]; then
   exit 1
 fi
 
+# Determine effective EIP behavior
+# Default: if ENABLE_ALB=true and ENABLE_EIP not explicitly set, disable EIP. Otherwise enable.
+if [ -z "${ENABLE_EIP:-}" ]; then
+  if [ "${ENABLE_ALB:-false}" = "true" ]; then
+    EFFECTIVE_ENABLE_EIP=false
+  else
+    EFFECTIVE_ENABLE_EIP=true
+  fi
+else
+  EFFECTIVE_ENABLE_EIP=${ENABLE_EIP}
+fi
+
 # Terraform common vars
 TF_COMMON_VARS=(
   -var="aws_profile=$AWS_PROFILE"
@@ -74,6 +86,7 @@ TF_COMMON_VARS=(
   -var="sftp_password=$SFTP_PASSWORD"
   -var="instance_type=${INSTANCE_TYPE:-t3.micro}"
   -var="cpu_unlimited=${CPU_UNLIMITED:-false}"
+  -var="enable_eip=${EFFECTIVE_ENABLE_EIP}"
 )
 
 # Domain/Route53/ALB vars

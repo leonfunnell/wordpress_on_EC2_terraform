@@ -105,6 +105,13 @@ variable "alb_subnet_ids" {
   default     = []
 }
 
+# EIP allocation (disabled automatically when ALB is enabled)
+variable "enable_eip" {
+  type        = bool
+  description = "Allocate and associate an Elastic IP to the instance. Ignored when ALB is enabled."
+  default     = true
+}
+
 # EC2 instance type
 variable "instance_type" {
   type        = string

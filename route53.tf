@@ -7,7 +7,7 @@ resource "aws_route53_record" "site_a_eip" {
   name            = var.domain_name
   type            = "A"
   ttl             = 300
-  records         = [aws_eip.wordpress_eip.public_ip]
+  records         = [aws_eip.wordpress_eip[0].public_ip]
   allow_overwrite = var.overwrite_dns_records
 }
 

@@ -86,7 +86,7 @@ resource "null_resource" "configure_server" {
       type        = "ssh"
       user        = "ubuntu"
       private_key = file(local_file.ssh_key.filename)
-      host        = aws_eip.wordpress_eip.public_ip
+      host        = var.enable_eip && !var.enable_alb ? aws_eip.wordpress_eip[0].public_ip : aws_instance.wordpress_server.public_ip
     }
 }
 
