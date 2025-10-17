@@ -67,13 +67,7 @@ variable "subnet_id" {
   default     = ""
 }
 
-# CloudFront/SSL/Domain variables
-variable "enable_cloudfront" {
-  type        = bool
-  description = "Enable CloudFront distribution with custom domain and SSL"
-  default     = false
-}
-
+# Cloud/domain settings (also used for ALB)
 variable "domain_name" {
   type        = string
   description = "Fully qualified domain name for the site (e.g., www.example.com)"
@@ -82,26 +76,33 @@ variable "domain_name" {
 
 variable "route53_zone_id" {
   type        = string
-  description = "Optional Route53 public hosted zone ID for the domain. If empty, DNS records will be printed for manual creation on external DNS."
+  description = "Optional Route53 public hosted zone ID for the domain. If empty, DNS records will be skipped."
   default     = ""
 }
 
 variable "overwrite_dns_records" {
   type        = bool
-  description = "If true, allow Terraform to overwrite existing Route53 A/CNAME records for the domain."
+  description = "If true, allow Terraform to overwrite existing Route53 A/ALIAS records for the domain."
   default     = false
 }
 
-variable "use_existing_certificate" {
+# ALB + SSL
+variable "enable_alb" {
   type        = bool
-  description = "If true, use an existing ACM certificate ARN (in us-east-1) instead of creating/validating one."
+  description = "Enable an internet-facing Application Load Balancer for the site"
   default     = false
 }
 
-variable "existing_certificate_arn" {
+variable "alb_certificate_arn" {
   type        = string
-  description = "Existing ACM certificate ARN in us-east-1 to use with CloudFront (required if use_existing_certificate = true and no Route53 zone)."
+  description = "Existing ACM certificate ARN in the same region as the ALB for HTTPS termination (optional). If blank and route53_zone_id+domain_name provided, Terraform will request/validate a new certificate."
   default     = ""
+}
+
+variable "alb_subnet_ids" {
+  type        = list(string)
+  description = "When using an existing VPC (vpc_id set), provide at least two public subnet IDs in different AZs for the ALB. Ignored when the module creates the VPC."
+  default     = []
 }
 
 # EC2 instance type
