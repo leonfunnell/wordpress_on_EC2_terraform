@@ -11,6 +11,7 @@ resource "aws_security_group" "wordpress_sg" {
     cidr_blocks = [var.ssh_allowed_cidr]
   }
 
+  # Instance serves HTTP for ALB target group health checks and traffic
   ingress {
     description = "HTTP"
     from_port   = 80
@@ -19,13 +20,8 @@ resource "aws_security_group" "wordpress_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # HTTPS not required on instance when using ALB (SSL terminates at ALB)
+  # Leaving out port 443 here to simplify and harden surface area
 
   ingress {
     description = "EFS mount target"
@@ -43,7 +39,7 @@ resource "aws_security_group" "wordpress_sg" {
   }
   
   tags = {
-    Name        = "WordPress SG"
+    Name    = "WordPress SG"
     Project = var.project_name
   }
 }
