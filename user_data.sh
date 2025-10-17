@@ -91,12 +91,12 @@ LATEST_SERIES=$(apt-cache search -n '^php[0-9]+\.[0-9]+-common$' | awk '{print $
 if [ -z "$LATEST_SERIES" ]; then
   # Fallback if search fails; default to distro PHP meta
   echo "WARN: Could not detect latest PHP series; installing distro 'php' meta"
-  apt-get -yq install php libapache2-mod-php php-mysql php-xml php-curl
+  apt-get -yq install php libapache2-mod-php php-mysql php-xml php-curl php-zip php-gd
   LATEST_SERIES=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "")
 else
   # Install matching PHP packages for the latest series
   apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install \
-    php${LATEST_SERIES} libapache2-mod-php${LATEST_SERIES} php${LATEST_SERIES}-mysql php${LATEST_SERIES}-xml php${LATEST_SERIES}-curl
+    php${LATEST_SERIES} libapache2-mod-php${LATEST_SERIES} php${LATEST_SERIES}-mysql php${LATEST_SERIES}-xml php${LATEST_SERIES}-curl php${LATEST_SERIES}-zip php${LATEST_SERIES}-gd
 fi
 
 # Make sure Apache and CLI use the selected PHP series
