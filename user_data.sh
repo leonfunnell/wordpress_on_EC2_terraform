@@ -98,7 +98,7 @@ if [ ! -f /var/www/html/wp-config.php ]; then
   cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
 fi
 
-echo "Step: configure wp-config.php (DB creds, salts, FS/FTP)"
+echo "Step: configure wp-config.php (DB creds, salts, FS/FTP, URL)"
 sed -i "s/database_name_here/${DB_NAME}/" /var/www/html/wp-config.php
 sed -i "s/username_here/${DB_USER}/" /var/www/html/wp-config.php
 sed -i "s/password_here/${DB_PASSWORD}/" /var/www/html/wp-config.php
@@ -108,6 +108,25 @@ sed -i "/AUTH_KEY/d;/SECURE_AUTH_KEY/d;/LOGGED_IN_KEY/d;/NONCE_KEY/d;/AUTH_SALT/
 if [ -s /tmp/wp.salts ]; then
   sed -i "/Happy publishing\./r /tmp/wp.salts" /var/www/html/wp-config.php || true
 fi
+
+# Determine external URL and set WP_HOME/WP_SITEURL
+SCHEME="http"
+if [ "${ENABLE_ALB:-false}" = "true" ] && [ -n "${DOMAIN_NAME:-}" ]; then
+  SCHEME="https"
+fi
+if [ -n "${DOMAIN_NAME:-}" ]; then
+  EXTERNAL_URL="${SCHEME}://${DOMAIN_NAME}"
+else
+  EXTERNAL_URL="http://${PUBLIC_IP}"
+fi
+sed -i "/WP_HOME/d;/WP_SITEURL/d" /var/www/html/wp-config.php || true
+cat >/tmp/wp.url <<EOF
+define('WP_HOME', '${EXTERNAL_URL}');
+define('WP_SITEURL', '${EXTERNAL_URL}');
+EOF
+sed -i "/Happy publishing\./r /tmp/wp.url" /var/www/html/wp-config.php || true
+
+# FS/FTP extras
 cat >/tmp/wp.extra <<EOF
 define('FS_METHOD', 'direct');
 define('FTP_HOST', 'localhost');
