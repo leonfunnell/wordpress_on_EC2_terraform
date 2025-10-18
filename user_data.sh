@@ -112,7 +112,7 @@ php -v || true
 # Install/update AWS CLI v2
 echo "Step: install/update AWS CLI v2"
 curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
-unzip -o /tmp/awscliv2.zip -d /tmp
+unzip -q -o /tmp/awscliv2.zip -d /tmp
 sudo /tmp/aws/install --update || true
 
 echo "Step: enable Apache rewrite"
