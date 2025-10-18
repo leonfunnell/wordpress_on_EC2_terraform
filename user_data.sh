@@ -1,138 +1,229 @@
 #!/bin/bash
 # must be run as sudo/root
 
+set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-source variables.sh
+# Logging
+LOG_FILE=/var/log/wp-user-data.log
+mkdir -p /var/log
+{
+  echo "===== $(date -u +"%Y-%m-%dT%H:%M:%SZ") user_data.sh start ====="
+} >> "$LOG_FILE" 2>&1
+exec > >(tee -a "$LOG_FILE") 2>&1
 
-TMP=`mktemp -d`
-cd $TMP
-set -e
+# Load variables
+if [ -f /home/ubuntu/variables.sh ]; then
+  # shellcheck disable=SC1091
+  source /home/ubuntu/variables.sh
+elif [ -f ./variables.sh ]; then
+  # shellcheck disable=SC1091
+  source ./variables.sh
+else
+  echo "WARN: variables.sh not found; proceeding with env defaults"
+fi
 
-# Set up EFS
-echo -e ${RED}running apt-get update...
+# Cap PHP to a WordPress-supported series (default: 8.4; avoids 8.5+)
+WP_MAX_PHP_SERIES="${WP_MAX_PHP_SERIES:-8.4}"
+
+TMP=$(mktemp -d)
+cd "$TMP"
+
+echo "Step: apt update/upgrade"
+apthold() { apt-mark hold "$@" || true; }
 apt-get -yq update
-echo -e ${RED}running apt-get upgrade...
 apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq upgrade
-echo -e ${RED}running apt-get update...
 apt-get -yq update
 
-echo -e ${RED}installing nfs-common...
-apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install nfs-common
+echo "Step: install nfs-common curl unzip"
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install nfs-common curl unzip
 
-# Wait for EFS DNS to resolve (max 2 minutes)
-for i in {1..24}; do
-  getent hosts $EFS_DNSNAME && break
-  echo "Waiting for EFS DNS to resolve..."
+# Determine target for EFS mount (prefer DNS, fallback to IP if DNS doesn't resolve)
+MOUNT_TARGET="${EFS_DNSNAME:-}"
+if [ -z "$MOUNT_TARGET" ] && [ -n "${EFS_IP:-}" ]; then
+  MOUNT_TARGET="$EFS_IP"
+fi
+
+echo "Step: wait for EFS DNS (or use IP) - target: $MOUNT_TARGET"
+for i in {1..36}; do # wait up to 3 minutes for DNS
+  if [ -n "${EFS_DNSNAME:-}" ] && getent hosts "$EFS_DNSNAME" >/dev/null 2>&1; then
+    MOUNT_TARGET="$EFS_DNSNAME"
+    break
+  fi
   sleep 5
+  if [ $i -eq 36 ] && [ -n "${EFS_IP:-}" ]; then
+    echo "EFS DNS not resolvable; fallback to IP $EFS_IP"
+    MOUNT_TARGET="$EFS_IP"
+  fi
 done
 
 # Ensure mount point exists before mounting
 mkdir -p /var/www/html
 
-# Retry EFS mount up to 5 times
-for i in {1..5}; do
-  mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport $EFS_DNSNAME:/  /var/www/html && break
-  echo "Retrying EFS mount..."
-  sleep 5
+echo "Step: mount EFS to /var/www/html"
+for i in {1..10}; do
+  if mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${MOUNT_TARGET}:/ /var/www/html; then
+    break
+  fi
+  echo "Retrying EFS mount... ($i)"
+  sleep 6
+  if [ "$MOUNT_TARGET" = "${EFS_DNSNAME:-}" ] && [ -n "${EFS_IP:-}" ] && ! getent hosts "$EFS_DNSNAME" >/dev/null 2>&1; then
+    echo "Switching to EFS IP $EFS_IP"
+    MOUNT_TARGET="$EFS_IP"
+  fi
 done
-
 mount | grep /var/www/html
-echo -e ${RED}installing apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl
-apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install apache2 mysql-server php libapache2-mod-php php-mysql vsftpd unzip php-xml php-curl
 
-# Install AWS CLI v2
-sudo apt-get install -y curl
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
-unzip -o /tmp/awscliv2.zip -d /tmp
-sudo /tmp/aws/install
+# Install base services and prereqs first
+echo "Step: install Apache/MySQL/VSFTPD + prereqs"
+apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install \
+  apache2 mysql-server vsftpd software-properties-common
+
+# Ensure the Ondrej PHP PPA is available (for latest PHP series)
+echo "Step: add PHP PPA if missing and refresh apt"
+if ! grep -R "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | grep -q .; then
+  add-apt-repository -y ppa:ondrej/php
+  apt-get -yq update
+fi
+
+# Determine a WordPress-supported latest PHP series (<= WP_MAX_PHP_SERIES)
+echo "Step: detect latest PHP series <= ${WP_MAX_PHP_SERIES}"
+AVAILABLE_SERIES=$(apt-cache search -n '^php[0-9]+\.[0-9]+-common$' | awk '{print $1}' | sed -E 's/^php([0-9]+\.[0-9]+)-common/\1/' | sort -V | uniq)
+TARGET_SERIES=""
+if [ -n "$AVAILABLE_SERIES" ]; then
+  TARGET_SERIES=$(printf "%s\n" "$AVAILABLE_SERIES" | awk -v max="$WP_MAX_PHP_SERIES" '
+    function verlte(a,b,  i1,i2){split(a,X,"."); split(b,Y,"."); for(i=1;i<=2;i++){i1=(X[i]?X[i]:0); i2=(Y[i]?Y[i]:0); if(i1<i2) return 1; if(i1>i2) return 0} return 1}
+    verlte($0,max)
+  ' | sort -V | tail -n1)
+fi
+if [ -z "$TARGET_SERIES" ]; then
+  echo "WARN: Could not detect suitable PHP series <= ${WP_MAX_PHP_SERIES}; installing distro 'php' meta"
+  apt-get -yq install php libapache2-mod-php php-mysql php-xml php-curl php-zip php-gd
+  TARGET_SERIES=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "")
+else
+  # Install matching PHP packages for the target series
+  apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install \
+    php${TARGET_SERIES} libapache2-mod-php${TARGET_SERIES} php${TARGET_SERIES}-mysql php${TARGET_SERIES}-xml php${TARGET_SERIES}-curl php${TARGET_SERIES}-zip php${TARGET_SERIES}-gd
+fi
+
+# Make sure Apache and CLI use the selected PHP series
+for v in 7.4 8.0 8.1 8.2 8.3 8.4 8.5; do a2dismod php${v} || true; done
+if [ -n "$TARGET_SERIES" ]; then
+  a2enmod php${TARGET_SERIES} || true
+  update-alternatives --set php /usr/bin/php${TARGET_SERIES} || true
+fi
+
+# Optional: verify PHP version
+php -v || true
+
+# Install/update AWS CLI v2
+echo "Step: install/update AWS CLI v2"
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+unzip -q -o /tmp/awscliv2.zip -d /tmp
+sudo /tmp/aws/install --update || true
+
+echo "Step: enable Apache rewrite"
+a2enmod rewrite || true
+
+# Install WordPress core files if not present (EFS will be empty on first boot)
+if [ ! -f /var/www/html/wp-settings.php ]; then
+  echo "Step: download and install WordPress core"
+  wget -q -c https://wordpress.org/latest.tar.gz
+  tar -xzf latest.tar.gz
+  rsync -a wordpress/ /var/www/html/
+fi
+
+# Generate wp-config.php from sample if needed
+if [ ! -f /var/www/html/wp-config.php ]; then
+  echo "Step: create wp-config.php from sample"
+  cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+fi
+
+echo "Step: configure wp-config.php (DB creds, salts, FS/FTP, URL)"
+sed -i "s/database_name_here/${DB_NAME}/" /var/www/html/wp-config.php
+sed -i "s/username_here/${DB_USER}/" /var/www/html/wp-config.php
+sed -i "s/password_here/${DB_PASSWORD}/" /var/www/html/wp-config.php
+
+curl -s https://api.wordpress.org/secret-key/1.1/salt/ > /tmp/wp.salts || true
+sed -i "/AUTH_KEY/d;/SECURE_AUTH_KEY/d;/LOGGED_IN_KEY/d;/NONCE_KEY/d;/AUTH_SALT/d;/SECURE_AUTH_SALT/d;/LOGGED_IN_SALT/d;/NONCE_SALT/d" /var/www/html/wp-config.php || true
+if [ -s /tmp/wp.salts ]; then
+  sed -i "/Happy publishing\./r /tmp/wp.salts" /var/www/html/wp-config.php || true
+fi
+
+# Determine external URL and set WP_HOME/WP_SITEURL
+SCHEME="http"
+if [ "${ENABLE_ALB:-false}" = "true" ] && [ -n "${DOMAIN_NAME:-}" ]; then
+  SCHEME="https"
+fi
+if [ -n "${DOMAIN_NAME:-}" ]; then
+  EXTERNAL_URL="${SCHEME}://${DOMAIN_NAME}"
+else
+  EXTERNAL_URL="http://${PUBLIC_IP}"
+fi
+sed -i "/WP_HOME/d;/WP_SITEURL/d" /var/www/html/wp-config.php || true
+cat >/tmp/wp.url <<EOF
+define('WP_HOME', '${EXTERNAL_URL}');
+define('WP_SITEURL', '${EXTERNAL_URL}');
+// Respect ALB/X-Forwarded-Proto so is_ssl() works and assets load over HTTPS
+if (isset(\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { \$_SERVER['HTTPS'] = 'on'; }
+if (!defined('FORCE_SSL_ADMIN')) define('FORCE_SSL_ADMIN', true);
+EOF
+sed -i "/Happy publishing\./r /tmp/wp.url" /var/www/html/wp-config.php || true
+
+# FS/FTP extras
+cat >/tmp/wp.extra <<EOF
+define('FS_METHOD', 'direct');
+define('FTP_HOST', 'localhost');
+define('FTP_USER', '${SFTP_USER}');
+define('FTP_PASS', '${SFTP_PASSWORD}');
+EOF
+sed -i "/Happy publishing\./r /tmp/wp.extra" /var/www/html/wp-config.php || true
+
+# Ensure /tmp is world-writable with sticky bit
+chmod 1777 /tmp
 
 # Set correct permissions for WordPress
 chown -R www-data:www-data /var/www/html
 find /var/www/html -type d -exec chmod 755 {} \;
 find /var/www/html -type f -exec chmod 644 {} \;
 
-# Ensure /tmp is world-writable with sticky bit
-chmod 1777 /tmp
-
-# Generate wp-config.php if it doesn't exist
-if [ ! -f /var/www/html/wp-config.php ]; then
-cat <<EOF > /var/www/html/wp-config.php
-<?php
-define('DB_NAME', '${DB_NAME}');
-define('DB_USER', '${DB_USER}');
-define('DB_PASSWORD', '${DB_PASSWORD}');
-define('DB_HOST', 'localhost');
-define('DB_CHARSET', 'utf8');
-define('DB_COLLATE', '');
-define('FS_METHOD', 'direct');
-
-// Authentication Unique Keys and Salts.
-
-define('AUTH_KEY',         '$(openssl rand -base64 32)');
-define('SECURE_AUTH_KEY',  '$(openssl rand -base64 32)');
-define('LOGGED_IN_KEY',    '$(openssl rand -base64 32)');
-define('NONCE_KEY',        '$(openssl rand -base64 32)');
-define('AUTH_SALT',        '$(openssl rand -base64 32)');
-define('SECURE_AUTH_SALT', '$(openssl rand -base64 32)');
-define('LOGGED_IN_SALT',   '$(openssl rand -base64 32)');
-define('NONCE_SALT',       '$(openssl rand -base64 32)');
-
-$table_prefix  = 'wp_';
-
-define('WP_DEBUG', false);
-
-if ( !defined('ABSPATH') )
-    define('ABSPATH', dirname(__FILE__) . '/');
-
-require_once(ABSPATH . 'wp-settings.php');
-EOF
+# Ensure persistent mount
+if ! grep -q " /var/www/html nfs4 " /etc/fstab; then
+  echo "${MOUNT_TARGET}:/ /var/www/html nfs4 defaults,_netdev 0 0" >> /etc/fstab
 fi
-
-# Add FTP config for plugin/theme updates
-cat <<EOT >> /var/www/html/wp-config.php
-
-define('FTP_HOST', 'localhost');
-define('FTP_USER', '${SFTP_USER}');
-define('FTP_PASS', '${SFTP_PASSWORD}');
-EOT
-
-# Mount NFS and configure fstab
-echo -e ${RED}mounting NFS:
-echo "$EFS_DNSNAME:/ /var/www/html nfs4 defaults,_netdev 0 0" >> /etc/fstab
 mount -a
-echo -e ${RED}result of mount NFS:
-mount | grep /var/www/html && echo -e ${RED}NFS Mounted successfully!
+mount | grep /var/www/html
 
-echo -e ${RED}Configure MySQL...
+echo "Step: configure MySQL"
 mysql -u root <<-EOF
-CREATE DATABASE $DB_NAME;
-CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
+CREATE DATABASE IF NOT EXISTS $DB_NAME;
+CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
 GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
+echo "Step: Apache vhost tweaks and restart"
 echo "<Directory /var/www/html/>" | tee -a /etc/apache2/sites-available/000-default.conf
-echo "    DirectoryIndex index.php index.html" | tee -a /etc/apache2/sites-available/000-default.conf
-echo "</Directory>" | tee -a /etc/apache2/sites-available/000-default.conf
+  echo "    DirectoryIndex index.php index.html" | tee -a /etc/apache2/sites-available/000-default.conf
+  echo "</Directory>" | tee -a /etc/apache2/sites-available/000-default.conf
 systemctl restart apache2
 
-echo -e ${RED}Install WordPress...
-wget -c http://wordpress.org/latest.tar.gz
-tar -xzf latest.tar.gz
-mv wordpress/* /var/www/html/
+# Download plugins (non-fatal)
+echo "Step: download plugins"
+wget -q https://downloads.wordpress.org/plugin/cookie-notice.2.4.8.zip || true
+wget -q https://downloads.wordpress.org/plugin/all-in-one-wp-migration.7.75.zip || true
+wget -q https://downloads.wordpress.org/plugin/elementor.3.13.4.zip || true
+wget -q https://downloads.wordpress.org/plugin/updraftplus.1.23.4.zip || true
+wget -q https://downloads.wordpress.org/plugin/wordfence.7.9.3.zip || true
+wget -q https://downloads.wordpress.org/plugin/wordpress-importer.0.8.1.zip || true
 
-# Download plugins to $TMP
-wget https://downloads.wordpress.org/plugin/cookie-notice.2.4.8.zip
-wget https://downloads.wordpress.org/plugin/all-in-one-wp-migration.7.75.zip 
-wget https://downloads.wordpress.org/plugin/elementor.3.13.4.zip
-wget https://downloads.wordpress.org/plugin/updraftplus.1.23.4.zip
-wget https://downloads.wordpress.org/plugin/wordfence.7.9.3.zip
-wget https://downloads.wordpress.org/plugin/wordpress-importer.0.8.1.zip
-
-# Unzip plugins into the plugins directory
-for zip in $TMP/*.zip; do
-  unzip "$zip" -d /var/www/html/wp-content/plugins/
+# Unzip plugins (non-fatal)
+echo "Step: install plugins"
+for zip in "$TMP"/*.zip; do
+  [ -f "$zip" ] || continue
+  unzip -o -q "$zip" -d /var/www/html/wp-content/plugins/ || true
 done
+
+echo "===== $(date -u +"%Y-%m-%dT%H:%M:%SZ") user_data.sh end ====="

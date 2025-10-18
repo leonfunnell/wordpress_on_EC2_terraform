@@ -61,35 +61,81 @@ if [ -z "$AMI" ]; then
   exit 1
 fi
 
+# Determine effective EIP behavior
+# Default: if ENABLE_ALB=true and ENABLE_EIP not explicitly set, disable EIP. Otherwise enable.
+if [ -z "${ENABLE_EIP:-}" ]; then
+  if [ "${ENABLE_ALB:-false}" = "true" ]; then
+    EFFECTIVE_ENABLE_EIP=false
+  else
+    EFFECTIVE_ENABLE_EIP=true
+  fi
+else
+  EFFECTIVE_ENABLE_EIP=${ENABLE_EIP}
+fi
+
+# Terraform common vars
+TF_COMMON_VARS=(
+  -var="aws_profile=$AWS_PROFILE"
+  -var="aws_region=$AWS_REGION"
+  -var="ami=$AMI"
+  -var="project_name=$PROJECT_NAME"
+  -var="db_name=$DB_NAME"
+  -var="db_user=$DB_USER"
+  -var="db_password=$DB_PASSWORD"
+  -var="sftp_user=$SFTP_USER"
+  -var="sftp_password=$SFTP_PASSWORD"
+  -var="instance_type=${INSTANCE_TYPE:-t3.micro}"
+  -var="cpu_unlimited=${CPU_UNLIMITED:-false}"
+  -var="enable_eip=${EFFECTIVE_ENABLE_EIP}"
+)
+
+# Domain/Route53/ALB vars
+TF_DOMAIN_VARS=(
+  -var="domain_name=${DOMAIN_NAME:-}"
+  -var="route53_zone_id=${ROUTE53_ZONE_ID:-}"
+  -var="overwrite_dns_records=${OVERWRITE_DNS_RECORDS:-false}"
+  -var="enable_alb=${ENABLE_ALB:-false}"
+  -var="alb_certificate_arn=${ALB_CERTIFICATE_ARN:-}"
+)
+
+# Optional: convert ALB_SUBNET_IDS_CSV into a tfvars.json file to avoid quoting issues
+TF_TEMP_VARS_FILE=""
+if [ -n "${ALB_SUBNET_IDS_CSV:-}" ]; then
+  IFS=',' read -ra SUBNETS_ARR <<< "$ALB_SUBNET_IDS_CSV"
+  JSON_LIST=$(printf '"%s",' "${SUBNETS_ARR[@]}")
+  JSON_LIST="[${JSON_LIST%,}]"
+  TF_TEMP_VARS_FILE=".alb_subnets.auto.tfvars.json"
+  echo "{ \"alb_subnet_ids\": ${JSON_LIST} }" > "$TF_TEMP_VARS_FILE"
+  TF_VAR_FILE_ARG=( -var-file="$TF_TEMP_VARS_FILE" )
+else
+  TF_VAR_FILE_ARG=()
+fi
+
+apply_stack() {
+  terraform init
+  terraform apply \
+      "${TF_COMMON_VARS[@]}" \
+      "${TF_DOMAIN_VARS[@]}" \
+      "${TF_VAR_FILE_ARG[@]}" \
+      -auto-approve
+}
+
+destroy_stack() {
+  terraform init
+  terraform destroy \
+      "${TF_COMMON_VARS[@]}" \
+      "${TF_DOMAIN_VARS[@]}" \
+      "${TF_VAR_FILE_ARG[@]}" \
+      -auto-approve
+}
+
 case "$1" in
 --destroy)
     echo "Destroying the Wordpress infrastructure..."
-    terraform init
-    terraform destroy \
-        -var="aws_profile=$AWS_PROFILE" \
-        -var="aws_region=$AWS_REGION" \
-        -var="ami=$AMI" \
-        -var="project_name=$PROJECT_NAME" \
-        -var="db_name=$DB_NAME" \
-        -var="db_user=$DB_USER" \
-        -var="db_password=$DB_PASSWORD" \
-        -var="sftp_user=$SFTP_USER" \
-        -var="sftp_password=$SFTP_PASSWORD" \
-        -auto-approve
+    destroy_stack
     ;;
 *)
     echo "Deploying the Wordpress infrastructure..."
-    terraform init
-    terraform apply \
-        -var="aws_profile=$AWS_PROFILE" \
-        -var="aws_region=$AWS_REGION" \
-        -var="ami=$AMI" \
-        -var="project_name=$PROJECT_NAME" \
-        -var="db_name=$DB_NAME" \
-        -var="db_user=$DB_USER" \
-        -var="db_password=$DB_PASSWORD" \
-        -var="sftp_user=$SFTP_USER" \
-        -var="sftp_password=$SFTP_PASSWORD" \
-        -auto-approve
+    apply_stack
     ;;
 esac

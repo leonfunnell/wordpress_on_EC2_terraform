@@ -66,3 +66,62 @@ variable "subnet_id" {
   description = "The Subnet ID to deploy resources into. If not set, a new subnet will be created."
   default     = ""
 }
+
+# Cloud/domain settings (also used for ALB)
+variable "domain_name" {
+  type        = string
+  description = "Fully qualified domain name for the site (e.g., www.example.com)"
+  default     = ""
+}
+
+variable "route53_zone_id" {
+  type        = string
+  description = "Optional Route53 public hosted zone ID for the domain. If empty, DNS records will be skipped."
+  default     = ""
+}
+
+variable "overwrite_dns_records" {
+  type        = bool
+  description = "If true, allow Terraform to overwrite existing Route53 A/ALIAS records for the domain."
+  default     = false
+}
+
+# ALB + SSL
+variable "enable_alb" {
+  type        = bool
+  description = "Enable an internet-facing Application Load Balancer for the site"
+  default     = false
+}
+
+variable "alb_certificate_arn" {
+  type        = string
+  description = "Existing ACM certificate ARN in the same region as the ALB for HTTPS termination (optional). If blank and route53_zone_id+domain_name provided, Terraform will request/validate a new certificate."
+  default     = ""
+}
+
+variable "alb_subnet_ids" {
+  type        = list(string)
+  description = "When using an existing VPC (vpc_id set), provide at least two public subnet IDs in different AZs for the ALB. Ignored when the module creates the VPC."
+  default     = []
+}
+
+# EIP allocation (disabled automatically when ALB is enabled)
+variable "enable_eip" {
+  type        = bool
+  description = "Allocate and associate an Elastic IP to the instance. Ignored when ALB is enabled."
+  default     = true
+}
+
+# EC2 instance type
+variable "instance_type" {
+  type        = string
+  description = "EC2 instance type for the WordPress server (e.g., t3.micro, t3.small)."
+  default     = "t3.micro"
+}
+
+# Optional: enable unlimited CPU credits for burstable instances (t2, t3, t3a, t4g)
+variable "cpu_unlimited" {
+  type        = bool
+  description = "If true, set CPU credit specification to 'unlimited' for T-family burstable instance types."
+  default     = false
+}
