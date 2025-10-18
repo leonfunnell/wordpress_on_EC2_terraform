@@ -57,6 +57,7 @@ resource "aws_instance" "wordpress_server" {
       host        = self.public_ip
       user        = "ubuntu"
       private_key = file(local_file.ssh_key.filename)
+      timeout     = "5m"
     }
   }
 
@@ -69,25 +70,40 @@ resource "aws_instance" "wordpress_server" {
       host        = self.public_ip
       user        = "ubuntu"
       private_key = file(local_file.ssh_key.filename)
+      timeout     = "5m"
     }
   }
 }
 
 resource "null_resource" "configure_server" {
-  depends_on = [aws_efs_mount_target.wordpress_efs_mount]
+  # Re-run when the instance changes, IP changes, or the script changes
+  triggers = {
+    instance_id    = aws_instance.wordpress_server.id
+    host_ip        = try(aws_eip.wordpress_eip[0].public_ip, aws_instance.wordpress_server.public_ip)
+    user_data_hash = filesha256("${path.module}/user_data.sh")
+  }
+
+  depends_on = [
+    aws_efs_mount_target.wordpress_efs_mount,
+    aws_instance.wordpress_server,
+    aws_eip_association.eip_assoc
+  ]
+
   provisioner "remote-exec" {
     inline = [
       "chmod +x /home/ubuntu/user_data.sh",
       "chmod +x /home/ubuntu/variables.sh",
       "sudo /home/ubuntu/user_data.sh"
     ]
-  }
+
     connection {
       type        = "ssh"
       user        = "ubuntu"
       private_key = file(local_file.ssh_key.filename)
-      host        = var.enable_eip && !var.enable_alb ? aws_eip.wordpress_eip[0].public_ip : aws_instance.wordpress_server.public_ip
+      host        = try(aws_eip.wordpress_eip[0].public_ip, aws_instance.wordpress_server.public_ip)
+      timeout     = "10m"
     }
+  }
 }
 
 resource "aws_iam_instance_profile" "ec2_efs_profile" {
