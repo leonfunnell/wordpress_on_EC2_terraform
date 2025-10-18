@@ -25,6 +25,9 @@ else
   echo "WARN: variables.sh not found; proceeding with env defaults"
 fi
 
+# Cap PHP to a WordPress-supported series (default: 8.4; avoids 8.5+)
+WP_MAX_PHP_SERIES="${WP_MAX_PHP_SERIES:-8.4}"
+
 TMP=$(mktemp -d)
 cd "$TMP"
 
@@ -85,25 +88,31 @@ if ! grep -R "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/n
   apt-get -yq update
 fi
 
-# Determine the latest available PHP series (e.g., 8.3, 8.4)
-echo "Step: detect latest PHP series"
-LATEST_SERIES=$(apt-cache search -n '^php[0-9]+\.[0-9]+-common$' | awk '{print $1}' | sed -E 's/^php([0-9]+\.[0-9]+)-common/\1/' | sort -V | tail -n1)
-if [ -z "$LATEST_SERIES" ]; then
-  # Fallback if search fails; default to distro PHP meta
-  echo "WARN: Could not detect latest PHP series; installing distro 'php' meta"
+# Determine a WordPress-supported latest PHP series (<= WP_MAX_PHP_SERIES)
+echo "Step: detect latest PHP series <= ${WP_MAX_PHP_SERIES}"
+AVAILABLE_SERIES=$(apt-cache search -n '^php[0-9]+\.[0-9]+-common$' | awk '{print $1}' | sed -E 's/^php([0-9]+\.[0-9]+)-common/\1/' | sort -V | uniq)
+TARGET_SERIES=""
+if [ -n "$AVAILABLE_SERIES" ]; then
+  TARGET_SERIES=$(printf "%s\n" "$AVAILABLE_SERIES" | awk -v max="$WP_MAX_PHP_SERIES" '
+    function verlte(a,b,  i1,i2){split(a,X,"."); split(b,Y,"."); for(i=1;i<=2;i++){i1=(X[i]?X[i]:0); i2=(Y[i]?Y[i]:0); if(i1<i2) return 1; if(i1>i2) return 0} return 1}
+    verlte($0,max)
+  ' | sort -V | tail -n1)
+fi
+if [ -z "$TARGET_SERIES" ]; then
+  echo "WARN: Could not detect suitable PHP series <= ${WP_MAX_PHP_SERIES}; installing distro 'php' meta"
   apt-get -yq install php libapache2-mod-php php-mysql php-xml php-curl php-zip php-gd
-  LATEST_SERIES=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "")
+  TARGET_SERIES=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "")
 else
-  # Install matching PHP packages for the latest series
+  # Install matching PHP packages for the target series
   apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -yq install \
-    php${LATEST_SERIES} libapache2-mod-php${LATEST_SERIES} php${LATEST_SERIES}-mysql php${LATEST_SERIES}-xml php${LATEST_SERIES}-curl php${LATEST_SERIES}-zip php${LATEST_SERIES}-gd
+    php${TARGET_SERIES} libapache2-mod-php${TARGET_SERIES} php${TARGET_SERIES}-mysql php${TARGET_SERIES}-xml php${TARGET_SERIES}-curl php${TARGET_SERIES}-zip php${TARGET_SERIES}-gd
 fi
 
 # Make sure Apache and CLI use the selected PHP series
-for v in 7.4 8.0 8.1 8.2 8.3 8.4; do a2dismod php${v} || true; done
-if [ -n "$LATEST_SERIES" ]; then
-  a2enmod php${LATEST_SERIES} || true
-  update-alternatives --set php /usr/bin/php${LATEST_SERIES} || true
+for v in 7.4 8.0 8.1 8.2 8.3 8.4 8.5; do a2dismod php${v} || true; done
+if [ -n "$TARGET_SERIES" ]; then
+  a2enmod php${TARGET_SERIES} || true
+  update-alternatives --set php /usr/bin/php${TARGET_SERIES} || true
 fi
 
 # Optional: verify PHP version
@@ -121,7 +130,7 @@ a2enmod rewrite || true
 # Install WordPress core files if not present (EFS will be empty on first boot)
 if [ ! -f /var/www/html/wp-settings.php ]; then
   echo "Step: download and install WordPress core"
-  wget -q -c http://wordpress.org/latest.tar.gz
+  wget -q -c https://wordpress.org/latest.tar.gz
   tar -xzf latest.tar.gz
   rsync -a wordpress/ /var/www/html/
 fi
