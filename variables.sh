@@ -41,3 +41,7 @@ export INSTANCE_TYPE=t3.micro
 
 # Enable unlimited CPU credits for burstable instances (t2/t3/t3a/t4g). Default: false
 export CPU_UNLIMITED=false
+
+# Max PHP minor series WordPress should use (prevents selecting unsupported future versions like 8.5)
+# Set to the latest series supported by your target WordPress version. Default: 8.4
+export WP_MAX_PHP_SERIES=8.4
